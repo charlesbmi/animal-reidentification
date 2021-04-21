@@ -54,8 +54,6 @@ def create_detection_map(annotations):
     for image in annotations['images']:
         # get all the detections for that image
         image_id = image['id']
-        # print("image_id")
-        # print(image_id)
         detections = []
         for a in annotations['annotations']:
             if a['image_id'] == image_id:
@@ -64,15 +62,7 @@ def create_detection_map(annotations):
                 # swap the bounding box dimensions to be [x y width height]
                 a['bbox'] = [float(bbox[0]), float(bbox[1]), float(bbox[2]), float(bbox[3])]
                 detections.append(a)
-        # print("DETECTIONS")
-        # print(detections)
         ann_map[str(image_id)] = detections
-        # print('DICT')
-        # print(ann_map[str(image_id)])
-        # print("KEYS")
-        # print(ann_map.keys())
-        # plt.plot(1)
-        # plt.show()
     return ann_map
 
 
@@ -94,11 +84,39 @@ def get_mask_prediction_function(model):
     return predict_masks
 
 
-def convert_boxes(boxes):
+def convert_boxes(boxes, imH, imW, extend = False):
     xmin, ymin, width, height = boxes[:, 0], boxes[:, 1], boxes[:, 2], boxes[:, 3]
     ymax = ymin + height
     xmax = xmin + width
-
+    print([xmin, xmax, ymin, ymax])
+    if extend:
+        # increase the size of the bounding box by 10% on all sides
+        exX = width*0.05 # sideways extend 5%
+        exYup = height*0.05 # up extend 5%
+        exYdown = height*0.15 # down extend 15%
+        if xmax+exX < imW:
+            xmax = xmax+exX
+        else:
+            xmax = imW
+        if xmin-exX > 0:
+            xmin = xmin-exX
+        else:
+            xmin = 0
+        if ymax+exYdown < imH:
+            ymax = ymax+exYdown
+        else:
+            ymax = imH
+        if ymin-exYup > 0:
+            ymin = ymin-exYup
+        else:
+            ymin = 0
+    print([xmin, xmax, ymin, ymax])
+    imH = float(imH)
+    imW = float(imW)
+    ymin = ymin / imH
+    ymax = ymax / imH
+    xmin = xmin / imW
+    xmax = xmax / imW
     return np.stack([ymin, xmin, ymax, xmax], axis=1).astype(np.float32)
 
 
@@ -203,14 +221,15 @@ def plot_image_annotations(image, boxes, masks, darken_image=0.5):
 # curl -o deepmac_1024x1024_coco17.tar.gz http://download.tensorflow.org/models/object_detection/tf2/20210329/deepmac_1024x1024_coco17.tar.gz
 # tar -xzf deepmac_1024x1024_coco17.tar.gz
 # and make sure you put it in the right location
+doExtend = True # making the bounding boxes slightly bigger
 
-model = tf.keras.models.load_model('../deepMAC/deepmac_1024x1024_coco17/saved_model')
+model = tf.keras.models.load_model('../../deepMAC/deepmac_1024x1024_coco17/saved_model')
 prediction_function = get_mask_prediction_function(model)
 
-BOX_ANNOTATION_FILE = '../Data/gzgc.coco/annotations/instances_train2020.json'
+BOX_ANNOTATION_FILE = '../../Data/gzgc.coco/annotations/instances_train2020.json'
 detection_map = create_detection_map(read_json(BOX_ANNOTATION_FILE))
 
-image_path = '../Data/gzgc.coco/images/train2020/000000000002.jpg'
+image_path = '../../Data/gzgc.coco/images/train2020/000000000032.jpg'
 image_id = os.path.basename(image_path).rstrip('.jpg')
 image_id = str(int(image_id))
 # print(detection_map.keys())
@@ -225,20 +244,19 @@ else:
     bboxes = np.array([det['bbox'] for det in detections]) # [x, y, width, height]
     print("BBOXES")
     print(bboxes)
-    bboxes = convert_boxes(bboxes) # becomes [ymin, xmin, ymax, xmax]
+    # f = plt.figure(figsize=(6, 5))
+    # ax = plt.subplot()
+    # plt.imshow(image)
+    # ax.add_patch(Rectangle((bboxes[0][1], bboxes[0][0]),
+    #                         bboxes[0][3]- bboxes[0][1], bboxes[0][2]- bboxes[0][0],
+    #                        linewidth=1, edgecolor='g', facecolor='none'))
+    plt.show()
+    bboxes = convert_boxes(bboxes, image.shape[0], image.shape[1], extend=doExtend) # becomes [ymin, xmin, ymax, xmax]
     print("BBOXES Converted")
     print(bboxes)
     print(image.shape)
-    f = plt.figure(figsize=(6, 5))
-    ax = plt.subplot()
-    plt.imshow(image)
-    ax.add_patch(Rectangle((bboxes[0][1], bboxes[0][0]),
-                            bboxes[0][3]- bboxes[0][1], bboxes[0][2]- bboxes[0][0],
-                           linewidth=1, edgecolor='g', facecolor='none'))
+    masks = prediction_function(tf.convert_to_tensor(image),
+                                tf.convert_to_tensor(bboxes, dtype=tf.float32))
+    ax = plot_image_annotations(image, bboxes, masks.numpy(), darken_image=0.75)
+    ax.set_title("Image ID: " + image_id)
     plt.show()
-    immm = tf.convert_to_tensor(image)
-    bbb = tf.convert_to_tensor(bboxes, dtype=tf.float32)
-    masks = prediction_function(immm, bbb)
-    # masks = prediction_function(tf.convert_to_tensor(image),
-    #                             tf.convert_to_tensor(bboxes, dtype=tf.float32))
-    plot_image_annotations(image, bboxes, masks.numpy(), darken_image=0.75)
