@@ -3,45 +3,45 @@ https://github.com/yunjey/pytorch-tutorial/blob/master/tutorials/03-advanced/ima
 """
 
 import torch
-import torchvision.transforms as transforms
-import torch.utils.data as data
 import os.path
 import pathlib
 from PIL import Image
 from pycocotools.coco import COCO
 
 
-class CocoDataset(data.Dataset):
+class CocoDataset(torch.utils.data.Dataset):
     """COCO Custom Dataset compatible with torch.utils.data.DataLoader."""
-    def __init__(self, root, json, transform=None):
+    def __init__(self, root, json, transform=None, filter_category=None):
         """Set the path for images and annotations.
 
         Args:
             root: image directory.
             json: coco annotation file path.
             transform: image transformer.
+            filter_category (iterable): set of categories to include, e.g. [0, 1]
         """
         self.root = root
         self.coco = COCO(json)
-        self.ids = list(self.coco.anns.keys())
+        # Store a static list of annotation IDs to index into
+        self.annotation_ids = list(self.coco.anns.keys())
         self.transform = transform
 
     def __getitem__(self, index):
-        """Returns one data pair (image and animal ID)."""
-        coco = self.coco
-        ann_id = self.ids[index]
-        img_id = coco.anns[ann_id]['image_id']
-        path = coco.loadImgs(img_id)[0]['file_name']
+        """Returns one animal sighting (image and animal name)."""
+        annotation_id = self.annotation_ids[index]
+        animal_name = self.coco.anns[annotation_id]['name']
+        image_id = self.coco.anns[annotation_id]['image_id']
+        path = self.coco.loadImgs(image_id)[0]['file_name']
 
         image = Image.open(os.path.join(self.root, path)).convert('RGB')
         if self.transform is not None:
             image = self.transform(image)
 
         # Return image and animal identifier
-        return image, target
+        return image, animal_name
 
     def __len__(self):
-        return len(self.ids)
+        return len(self.annotation_ids)
 
 
 def get_loader(root, json, transform, batch_size, shuffle=True, num_workers=4):
@@ -61,19 +61,31 @@ def get_loader(root, json, transform, batch_size, shuffle=True, num_workers=4):
 
 
 def main():
-    # Test the class
+    # Example usage of the dataset loader
+    # These packages are only necessary for this test, so we import here
     import argparse
+    import torchvision.transforms as transforms
+
     parser = argparse.ArgumentParser(description='test data_loader')
     parser.add_argument('-i', '--images', type=pathlib.Path,
+            required=True,
             help='folder with images')
     parser.add_argument('-j', '--json', type=pathlib.Path,
+            required=True,
             help='Annotations JSON file in COCO-format')
     args = parser.parse_args()
 
-    transforms = torchvision.transforms.ToTensor()
-    batch_size = 32
-    shuffle=True
-    data_loader = get_loader(args.images, args.json, transforms, batch_size, shuffle)
+    transforms = transforms.Compose([
+        transforms.Resize([500, 750]),
+        transforms.ToTensor(),
+    ])
+    data_loader = get_loader(args.images, args.json, transforms, batch_size=4, shuffle=False)
+
+    # Print single element from the data loader
+    for image, animal_name in data_loader:
+        print(f'first batch image shape: {image.shape}')
+        print(f'first batch animal_name: {animal_name}')
+        break
 
     return
 
