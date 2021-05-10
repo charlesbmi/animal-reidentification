@@ -84,32 +84,10 @@ def get_mask_prediction_function(model):
     return predict_masks
 
 
-def convert_boxes(boxes, imH, imW, extend = False):
+def convert_boxes(boxes, imH, imW):
     xmin, ymin, width, height = boxes[:, 0], boxes[:, 1], boxes[:, 2], boxes[:, 3]
     ymax = ymin + height
     xmax = xmin + width
-    print([xmin, xmax, ymin, ymax])
-    if extend:
-        # increase the size of the bounding box by 10% on all sides
-        exX = width*0.05 # sideways extend 5%
-        exYup = height*0.05 # up extend 5%
-        exYdown = height*0.15 # down extend 15%
-        if xmax+exX < imW:
-            xmax = xmax+exX
-        else:
-            xmax = imW
-        if xmin-exX > 0:
-            xmin = xmin-exX
-        else:
-            xmin = 0
-        if ymax+exYdown < imH:
-            ymax = ymax+exYdown
-        else:
-            ymax = imH
-        if ymin-exYup > 0:
-            ymin = ymin-exYup
-        else:
-            ymin = 0
     print([xmin, xmax, ymin, ymax])
     imH = float(imH)
     imW = float(imW)
@@ -209,7 +187,8 @@ def plot_image_annotations(image, boxes, masks, darken_image=0.5):
         color_image = np.ones_like(image) * color[np.newaxis, np.newaxis, :]
         color_and_mask = np.concatenate(
             [color_image, mask[:, :, np.newaxis]], axis=2)
-
+        print('imageSHAPE')
+        print(color_and_mask.shape)
         ax.imshow(color_and_mask, alpha=0.5)
 
         color_index = (color_index + 1) % num_colors
@@ -221,7 +200,6 @@ def plot_image_annotations(image, boxes, masks, darken_image=0.5):
 # curl -o deepmac_1024x1024_coco17.tar.gz http://download.tensorflow.org/models/object_detection/tf2/20210329/deepmac_1024x1024_coco17.tar.gz
 # tar -xzf deepmac_1024x1024_coco17.tar.gz
 # and make sure you put it in the right location
-doExtend = True # making the bounding boxes slightly bigger
 
 model = tf.keras.models.load_model('../../deepMAC/deepmac_1024x1024_coco17/saved_model')
 prediction_function = get_mask_prediction_function(model)
@@ -229,7 +207,7 @@ prediction_function = get_mask_prediction_function(model)
 BOX_ANNOTATION_FILE = '../../Data/gzgc.coco/annotations/instances_train2020.json'
 detection_map = create_detection_map(read_json(BOX_ANNOTATION_FILE))
 
-image_path = '../../Data/gzgc.coco/images/train2020/000000000085.jpg'
+image_path = '../../Data/gzgc.coco/images/train2020/000000000004.jpg'
 image_id = os.path.basename(image_path).rstrip('.jpg')
 image_id = str(int(image_id))
 # print(detection_map.keys())
@@ -241,7 +219,7 @@ elif len(detection_map[image_id]) == 0:
 else:
     detections = detection_map[image_id]
     image = read_image(image_path)
-    bboxes = np.array([det['bbox'] for det in detections]) # [x, y, width, height]
+    bboxes = np.array([det['bbox'] for det in detections])  # [x, y, width, height]
     print("BBOXES")
     print(bboxes)
     # f = plt.figure(figsize=(6, 5))
@@ -251,7 +229,7 @@ else:
     #                         bboxes[0][3]- bboxes[0][1], bboxes[0][2]- bboxes[0][0],
     #                        linewidth=1, edgecolor='g', facecolor='none'))
     plt.show()
-    bboxes = convert_boxes(bboxes, image.shape[0], image.shape[1], extend=doExtend) # becomes [ymin, xmin, ymax, xmax]
+    bboxes = convert_boxes(bboxes, image.shape[0], image.shape[1])  # becomes [ymin, xmin, ymax, xmax]
     print("BBOXES Converted")
     print(bboxes)
     print(image.shape)
@@ -262,3 +240,12 @@ else:
     plt.show()
 
     # now for each segmentation in the image, black out every pixel that is not a segmentation part
+    for mask in masks.numpy():
+        segImage = image.copy()
+        binaryMask = (mask > 0.5).astype(np.float32)
+        print('BINARY SHAPE')
+        print(binaryMask.shape)
+        print(np.unique(binaryMask))
+        segImage[np.where(binaryMask == 0.0)] = 0
+        plt.imshow(segImage)
+        plt.show()

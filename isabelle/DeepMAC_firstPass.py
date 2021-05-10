@@ -229,7 +229,7 @@ prediction_function = get_mask_prediction_function(model)
 BOX_ANNOTATION_FILE = '../../Data/gzgc.coco/annotations/instances_train2020.json'
 detection_map = create_detection_map(read_json(BOX_ANNOTATION_FILE))
 
-image_path = '../../Data/gzgc.coco/images/train2020/000000000032.jpg'
+image_path = '../../Data/gzgc.coco/images/train2020/000000000085.jpg'
 image_id = os.path.basename(image_path).rstrip('.jpg')
 image_id = str(int(image_id))
 # print(detection_map.keys())
@@ -260,3 +260,5 @@ else:
     ax = plot_image_annotations(image, bboxes, masks.numpy(), darken_image=0.75)
     ax.set_title("Image ID: " + image_id)
     plt.show()
+
+    # now for each segmentation in the image, black out every pixel that is not a segmentation part
