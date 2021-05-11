@@ -15,24 +15,25 @@ def initialize_model(use_pretrained=True, l1Units = 500, l2Units=128):
     for param in model.parameters():
         param.requires_grad = False  # because these layers are pretrained
     # change the final layer to be a bottle neck of two layers
-    model.classifier = nn.Sequential(nn.Linear(1920, l1Units), nn.Linear(l1Units,
+    extracted_features_size = model.classifier.in_features
+    model.classifier = nn.Sequential(nn.Linear(extracted_features_size, l1Units), nn.Linear(l1Units,
                                                                      l2Units))  # assuming that the fc7 layer has 512 neurons, otherwise change it
     return model
 
-def train(args, model, device, train_loader, optimizer, epoch, triplet_loss):
+def train(args, model, device, train_loader, optimizer, epoch, triplet_loss_func):
     '''
     This is your training function. When you call this function, the model is
     trained for 1 epoch.
     '''
     model.train()  # Set the model to training mode
-    for batch_idx, (data, target) in enumerate(train_loader):
-        data, target = data.to(device), target.to(device)
+    for batch_idx, (data, labels) in enumerate(train_loader):
+        data, labels = data.to(device), labels.to(device)
         optimizer.zero_grad()  # Clear the gradient
-        output = model(data)  # Make predictions
-        loss = F.triplet_margin_loss(anchor, positive, negative, margin=1.0, p=2)
+        embeddings = model(data)  # Make predictions
+        loss = triplet_loss_func(embeddings, labels)
         loss.backward()  # Gradient computation
         optimizer.step()  # Perform a single optimization step
-        if batch_idx % args.log_interval == 0:
+        if batch_idx % args.batch_log_interval == 0:
             print('Train Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}'.format(
                 epoch, batch_idx * len(data), len(train_loader.sampler),
                        100. * batch_idx / len(train_loader), loss.item()))
@@ -43,14 +44,14 @@ def test(model, device, test_loader, dataName):
     correct = 0 # number of times it gets the distances correct
     test_num = 0
     with torch.no_grad():  # For the inference step, gradient is not computed
-        for data, target in test_loader:
-            data, target = data.to(device), target.to(device)
-            output = model(data)
+        for data, labels in test_loader:
+            data, labels = data.to(device), labels.to(device)
+            embeddings = model(data)
             # TO DO: function that takes output and turns into anchor, positive, negative
             test_loss += F.triplet_margin_loss(anchor, positive, negative, margin=1.0, p=2) # sum up batch loss
             # pull the predicted matches from the output
             # pred = output.argmax(dim=1, keepdim=True)  # get the index of the max log-probability
-            # correct += pred.eq(target.view_as(pred)).sum().item()
+            # correct += pred.eq(labels.view_as(pred)).sum().item()
             #test_num += len(data)
 
     #test_loss /= test_num
@@ -95,6 +96,8 @@ def main():
                         help='JSON with COCO-format annotations for training dataset')
     parser.add_argument('--val-json', required=True,
                         help='JSON with COCO-format annotations for validation dataset')
+    parser.add_argument('--batch-log-interval', type=int, default=10,
+                        help='Number of batches to run each epoch before logging metrics.')
     args = parser.parse_args()
     use_cuda = not args.no_cuda and torch.cuda.is_available()
 
@@ -142,7 +145,7 @@ def main():
     valLoss = []
     for epoch in range(1, args.epochs + 1):
         train(args, model, device, train_loader, optimizer, epoch,
-                triplet_loss=None) # None placeholder for triplet loss argument
+                triplet_loss_func=None) # None placeholder for triplet loss argument
         trloss = test(model, device, train_loader, "train data")
         vloss = test(model, device, val_loader, "val data")
         trainLoss.append(trloss)
