@@ -28,17 +28,24 @@ class CocoDataset(torch.utils.data.Dataset):
 
     def __getitem__(self, index):
         """Returns one animal sighting (image and animal name)."""
+        # index into the annotations
         annotation_id = self.annotation_ids[index]
-        animal_name = self.coco.anns[annotation_id]['name']
-        image_id = self.coco.anns[annotation_id]['image_id']
-        path = self.coco.loadImgs(image_id)[0]['file_name']
 
-        image = Image.open(os.path.join(self.root, path)).convert('RGB')
-        if self.transform is not None:
+        # Load the image
+        image_id = self.coco.anns[annotation_id]['image_id']
+        image_path = self.coco.loadImgs(image_id)[0]['file_name']
+        image = Image.open(os.path.join(self.root, image_path)).convert('RGB')
+        if self.transform:
             image = self.transform(image)
 
-        # Return image and animal identifier
-        return image, animal_name
+        # Load the animal ID
+        animal_name = self.coco.anns[annotation_id]['name']
+        # Note: this assumes that name-numbers are unique, which may not be
+        # true across multiple species
+        individual_animal_id = int(animal_name.split('_')[-1])
+
+        # Return image and animal individual ID
+        return image, individual_animal_id
 
     def __len__(self):
         return len(self.annotation_ids)
@@ -82,9 +89,9 @@ def main():
     data_loader = get_loader(args.images, args.json, transforms, batch_size=4, shuffle=False)
 
     # Print single element from the data loader
-    for image, animal_name in data_loader:
+    for image, individual_animal_id in data_loader:
         print(f'first batch image shape: {image.shape}')
-        print(f'first batch animal_name: {animal_name}')
+        print(f'first batch animal_name: {individual_animal_id}')
         break
 
     return
