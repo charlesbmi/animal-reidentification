@@ -1,13 +1,15 @@
 import torch
 import torch.nn.functional as F
+import torchvision
 import argparse
 import numpy as np
 import torch.nn as nn
 import torch.optim as optim
+import data_loader
 from torch.optim.lr_scheduler import StepLR
-from matplotlib import plt
+import matplotlib.pyplot as plt
 
-def initialize_model(use_pretrained=True, l1Units = 500, l2Units=128)
+def initialize_model(use_pretrained=True, l1Units = 500, l2Units=128):
 
     model = torch.hub.load('pytorch/vision:v0.9.0', 'densenet201', pretrained=use_pretrained)
     for param in model.parameters():
@@ -64,7 +66,7 @@ def main():
     # Training settings
     # Use the command line to modify the default settings
     parser = argparse.ArgumentParser(description='TripNet: a network for ReID')
-    parser.add_argument('name',
+    parser.add_argument('--name',
                         help="what you want to name this model save file")
     parser.add_argument('--epochs', type=int, default=14, metavar='N',
                         help='number of epochs to train (default: 14)')
@@ -84,6 +86,15 @@ def main():
                         help='model file path or model name for plotting fract comparison')
     parser.add_argument('--save-model', action='store_true', default=True,
                         help='For Saving the current Model')
+    parser.add_argument('--batch-size', type=int, default=64,
+                        help='Training batch size')
+    # It might be helpful to split data_folder into separate arguments for train/val/test
+    parser.add_argument('--data-folder', required=True,
+                        help='folder containing data images')
+    parser.add_argument('--train-json', required=True,
+                        help='JSON with COCO-format annotations for training dataset')
+    parser.add_argument('--val-json', required=True,
+                        help='JSON with COCO-format annotations for validation dataset')
     args = parser.parse_args()
     use_cuda = not args.no_cuda and torch.cuda.is_available()
 
@@ -92,7 +103,28 @@ def main():
     device = torch.device("cuda" if use_cuda else "cpu")
     kwargs = {'num_workers': 1, 'pin_memory': True} if use_cuda else {}
 
-    # dataset = ???
+    # TODO: update these (placeholder) transforms
+    # Also, we may need different transforms for train/val
+    transforms = torchvision.transforms.Compose([
+        torchvision.transforms.Resize([500, 750]), # Some images are slightly different sizes
+        torchvision.transforms.ToTensor(),
+    ])
+
+    # Initialize dataset loaders
+    train_loader = data_loader.get_loader(
+        args.data_folder,
+        args.train_json,
+        transforms,
+        batch_size=args.batch_size,
+        shuffle=True
+    )
+    val_loader = data_loader.get_loader(
+        args.data_folder,
+        args.val_json,
+        transforms,
+        batch_size=args.batch_size,
+        shuffle=True
+    )
 
     # object recognition, pretrained on imagenet
     # https://pytorch.org/hub/pytorch_vision_densenet/
@@ -109,7 +141,8 @@ def main():
     trainLoss = []
     valLoss = []
     for epoch in range(1, args.epochs + 1):
-        train(args, model, device, train_loader, optimizer, epoch)
+        train(args, model, device, train_loader, optimizer, epoch,
+                triplet_loss=None) # None placeholder for triplet loss argument
         trloss = test(model, device, train_loader, "train data")
         vloss = test(model, device, val_loader, "val data")
         trainLoss.append(trloss)
