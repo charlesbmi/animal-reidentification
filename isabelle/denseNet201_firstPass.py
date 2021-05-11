@@ -8,10 +8,11 @@ import torch.optim as optim
 import data_loader
 from torch.optim.lr_scheduler import StepLR
 import matplotlib.pyplot as plt
+import pytorch_metric_learning.losses
 
 def initialize_model(use_pretrained=True, l1Units = 500, l2Units=128):
 
-    model = torch.hub.load('pytorch/vision:v0.9.0', 'densenet201', pretrained=use_pretrained)
+    model = torch.hub.load('pytorch/vision:v0.9.0', 'densenet121', pretrained=use_pretrained)
     for param in model.parameters():
         param.requires_grad = False  # because these layers are pretrained
     # change the final layer to be a bottle neck of two layers
@@ -109,7 +110,7 @@ def main():
     # TODO: update these (placeholder) transforms
     # Also, we may need different transforms for train/val
     transforms = torchvision.transforms.Compose([
-        torchvision.transforms.Resize([500, 750]), # Some images are slightly different sizes
+        torchvision.transforms.Resize([400, 600]), # Some images are slightly different sizes
         torchvision.transforms.ToTensor(),
     ])
 
@@ -145,7 +146,10 @@ def main():
     valLoss = []
     for epoch in range(1, args.epochs + 1):
         train(args, model, device, train_loader, optimizer, epoch,
-                triplet_loss_func=None) # None placeholder for triplet loss argument
+                triplet_loss_func=pytorch_metric_learning.losses.TripletMarginLoss(
+                    margin=0.2, smooth_loss=True, triplets_per_anchor=10,
+                )
+            )
         trloss = test(model, device, train_loader, "train data")
         vloss = test(model, device, val_loader, "val data")
         trainLoss.append(trloss)
