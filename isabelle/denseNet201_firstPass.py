@@ -9,6 +9,7 @@ import data_loader
 from torch.optim.lr_scheduler import StepLR
 import matplotlib.pyplot as plt
 import pytorch_metric_learning.losses
+import pytorch_metric_learning.miners
 
 def initialize_model(use_pretrained=True, l1Units=256, l2Units=64):
 
@@ -21,7 +22,7 @@ def initialize_model(use_pretrained=True, l1Units=256, l2Units=64):
                                                                      l2Units))  # assuming that the fc7 layer has 512 neurons, otherwise change it
     return model
 
-def train(args, model, device, train_loader, optimizer, epoch, triplet_loss_func):
+def train(args, model, device, train_loader, optimizer, epoch, triplet_loss_func, miner=None):
     '''
     This is your training function. When you call this function, the model is
     trained for 1 epoch.
@@ -31,7 +32,11 @@ def train(args, model, device, train_loader, optimizer, epoch, triplet_loss_func
         data, labels = data.to(device), labels.to(device)
         optimizer.zero_grad()  # Clear the gradient
         embeddings = model(data)  # Make predictions
-        loss = triplet_loss_func(embeddings, labels)
+        if miner:
+            mined_pairs = miner(embeddings, labels)
+            loss = triplet_loss_func(embeddings, labels, mined_pairs)
+        else:
+            loss = triplet_loss_func(embeddings, labels)
         loss.backward()  # Gradient computation
         optimizer.step()  # Perform a single optimization step
         if batch_idx % args.batch_log_interval == 0:
@@ -148,6 +153,9 @@ def main():
         train(args, model, device, train_loader, optimizer, epoch,
                 triplet_loss_func=pytorch_metric_learning.losses.TripletMarginLoss(
                     margin=0.2, smooth_loss=True, triplets_per_anchor=10,
+                ),
+                miner=pytorch_metric_learning.miners.UniformHistogramMiner(
+                    num_bins=10
                 )
             )
         trloss = test(model, device, train_loader, "train data")
