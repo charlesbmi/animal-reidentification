@@ -46,11 +46,13 @@ def test(model, device, test_loader, dataName):
     correct = 0 # number of times it gets the distances correct
     test_num = 0
     with torch.no_grad():  # For the inference step, gradient is not computed
-        for data, labels in test_loader:
-            data, labels = data.to(device), labels.to(device)
-            embeddings = model(data)
+        for (img1, img2, img3) in test_loader:
+            img1, img2, img3 = img1.to(device), img2.to(device), img3.to(device)
+            anchor_emb = model(img1)
+            positive_emb = model(img2)
+            negative_emb = model(img3) 
             # TO DO: function that takes output and turns into anchor, positive, negative
-            test_loss += F.triplet_margin_loss(anchor, positive, negative, margin=1.0, p=2) # sum up batch loss
+            test_loss += F.triplet_margin_loss(anchor_emb, positive_emb, negative_emb, margin=1.0, p=2) # sum up batch loss
             # pull the predicted matches from the output
             # pred = output.argmax(dim=1, keepdim=True)  # get the index of the max log-probability
             # correct += pred.eq(labels.view_as(pred)).sum().item()
