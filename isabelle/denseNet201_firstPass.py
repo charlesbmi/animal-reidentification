@@ -20,7 +20,7 @@ def initialize_model(use_pretrained=True, l1Units = 500, l2Units=128):
                                                                      l2Units))  # assuming that the fc7 layer has 512 neurons, otherwise change it
     return model
 
-def train(args, model, device, train_loader, optimizer, epoch, triplet_loss_func):
+def train(args, model, device, train_loader, optimizer, epoch):
     '''
     This is your training function. When you call this function, the model is
     trained for 1 epoch.
@@ -30,7 +30,7 @@ def train(args, model, device, train_loader, optimizer, epoch, triplet_loss_func
         data, labels = data.to(device), labels.to(device)
         optimizer.zero_grad()  # Clear the gradient
         embeddings = model(data)  # Make predictions
-        loss = triplet_loss_func(embeddings, labels)
+        loss = F.triplet_margin_loss(anchor, positive, negative, margin=1.0, p=2)  # sum up batch loss
         loss.backward()  # Gradient computation
         optimizer.step()  # Perform a single optimization step
         if batch_idx % args.batch_log_interval == 0:
@@ -144,8 +144,7 @@ def main():
     trainLoss = []
     valLoss = []
     for epoch in range(1, args.epochs + 1):
-        train(args, model, device, train_loader, optimizer, epoch,
-                triplet_loss_func=None) # None placeholder for triplet loss argument
+        train(args, model, device, train_loader, optimizer, epoch) # None placeholder for triplet loss argument
         trloss = test(model, device, train_loader, "train data")
         vloss = test(model, device, val_loader, "val data")
         trainLoss.append(trloss)
