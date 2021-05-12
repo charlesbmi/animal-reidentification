@@ -5,7 +5,7 @@ import os
 np.random.seed(21)
 
 # load the annotations
-BOX_ANNOTATION_FILE = '../../Data/gzgc.coco/annotations/instances_train2020.json'
+BOX_ANNOTATION_FILE = '/media/data/ComputerVisionCourse/zebragiraffe/labels.json'
 with open(BOX_ANNOTATION_FILE) as f:
     data_orig = json.load(f)
 f.close()
@@ -99,17 +99,20 @@ print(len(data_test['annotations']))
 print(totalAnns)
 
 # save out the new jsons
-new_data_path = '../../Data/gzgc.coco/annotations/'
+new_data_path = '/media/data/ComputerVisionCourse/zebragiraffe/annotations/'
 os.makedirs(new_data_path, exist_ok=True) # create directory if needed
 
 with open(new_data_path + 'customSplit_train.json', 'w') as outfile:
     json.dump(data_train, outfile, indent = 4, ensure_ascii = False)
+    print('Wrote to:', outfile.name)
 
 with open(new_data_path + 'customSplit_val.json', 'w') as outfile:
     json.dump(data_val, outfile, indent = 4, ensure_ascii = False)
+    print('Wrote to:', outfile.name)
 
 with open(new_data_path + 'customSplit_test.json', 'w') as outfile:
     json.dump(data_test, outfile, indent = 4, ensure_ascii = False)
+    print('Wrote to:', outfile.name)
 
 #6286
 # targ train = 4400
