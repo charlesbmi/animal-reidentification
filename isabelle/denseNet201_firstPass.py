@@ -132,7 +132,7 @@ def main():
     # object recognition, pretrained on imagenet
     # https://pytorch.org/hub/pytorch_vision_densenet/
     model = initialize_model(use_pretrained=True, l1Units = 500, l2Units=128)
-    print(model)
+    # print(model)
     model = model.to(device)
     # Try different optimzers here [Adam, SGD, RMSprop]
     optimizer = optim.Adam(model.parameters(), lr=args.lr, weight_decay = args.weight_decay)

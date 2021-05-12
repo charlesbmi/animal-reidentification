@@ -67,6 +67,7 @@ print(data_orig['annotations'][0])
 # create training dataset
 data_train = {}
 data_train['categories'] = data_orig['categories'].copy()
+data_train['images'] = data_orig['images'].copy()
 data_train['annotations'] = []
 for name in zebra_train:
     # append all images this zebra appears in
@@ -75,6 +76,7 @@ for name in zebra_train:
 # create validation dataset
 data_val = {}
 data_val['categories'] = data_orig['categories'].copy()
+data_val['images'] = data_orig['images'].copy()
 data_val['annotations'] = []
 for name in zebra_val:
     # append all images this zebra appears in
@@ -83,6 +85,7 @@ for name in zebra_val:
 # create test dataset
 data_test = {}
 data_test['categories'] = data_orig['categories'].copy()
+data_test['images'] = data_orig['images'].copy()
 data_test['annotations'] = []
 for name in zebra_test:
     # append all images this zebra appears in
