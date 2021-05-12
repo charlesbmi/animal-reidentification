@@ -10,7 +10,7 @@ from torch.optim.lr_scheduler import StepLR
 import matplotlib.pyplot as plt
 import pytorch_metric_learning.losses
 
-def initialize_model(use_pretrained=True, l1Units = 500, l2Units=128):
+def initialize_model(use_pretrained=True, l1Units=256, l2Units=64):
 
     model = torch.hub.load('pytorch/vision:v0.9.0', 'densenet121', pretrained=use_pretrained)
     for param in model.parameters():
@@ -132,7 +132,7 @@ def main():
 
     # object recognition, pretrained on imagenet
     # https://pytorch.org/hub/pytorch_vision_densenet/
-    model = initialize_model(use_pretrained=True, l1Units = 500, l2Units=128)
+    model = initialize_model(use_pretrained=True)
     print(model)
     model = model.to(device)
     # Try different optimzers here [Adam, SGD, RMSprop]
