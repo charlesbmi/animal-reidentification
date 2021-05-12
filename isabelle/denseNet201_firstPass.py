@@ -18,8 +18,10 @@ def initialize_model(use_pretrained=True, l1Units=256, l2Units=64):
         param.requires_grad = False  # because these layers are pretrained
     # change the final layer to be a bottle neck of two layers
     extracted_features_size = model.classifier.in_features
-    model.classifier = nn.Sequential(nn.Linear(extracted_features_size, l1Units), nn.Linear(l1Units,
-                                                                     l2Units))  # assuming that the fc7 layer has 512 neurons, otherwise change it
+    model.classifier = nn.Sequential(
+        nn.Linear(extracted_features_size, l1Units),
+        nn.Linear(l1Units, l2Units)
+    )
     return model
 
 def train(args, model, device, train_loader, optimizer, epoch, triplet_loss_func, miner=None):
