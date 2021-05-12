@@ -1,5 +1,6 @@
 import torch
 import torch.nn.functional as F
+import torch.utils.data
 import torchvision
 import argparse
 import numpy as np
@@ -10,6 +11,7 @@ from torch.optim.lr_scheduler import StepLR
 import matplotlib.pyplot as plt
 import pytorch_metric_learning.losses
 import pytorch_metric_learning.miners
+import pytorch_metric_learning.samplers
 
 def initialize_model(use_pretrained=True, l1Units=256, l2Units=64):
 
@@ -122,13 +124,20 @@ def main():
     ])
 
     # Initialize dataset loaders
-    train_loader = data_loader.get_loader(
-        args.data_folder,
-        args.train_json,
-        transforms,
-        batch_size=args.batch_size,
-        shuffle=True
+    train_dataset = data_loader.CocoDataset(
+        args.data_folder, args.train_json, transforms
     )
+    train_loader = torch.utils.data.DataLoader(
+        train_dataset,
+        sampler=pytorch_metric_learning.samplers.MPerClassSampler(
+            [train_dataset.coco.anns[annotation_id]['name'] for annotation_id in train_dataset.annotation_ids],
+            m=2,
+            batch_size=args.batch_size,
+            length_before_new_iter=len(train_dataset)
+        ),
+        batch_size=args.batch_size,
+        num_workers=4
+        )
     val_loader = data_loader.get_loader(
         args.data_folder,
         args.val_json,
@@ -156,9 +165,7 @@ def main():
                 triplet_loss_func=pytorch_metric_learning.losses.TripletMarginLoss(
                     margin=0.2, smooth_loss=True, triplets_per_anchor=10,
                 ),
-                miner=pytorch_metric_learning.miners.UniformHistogramMiner(
-                    num_bins=10
-                )
+                miner=pytorch_metric_learning.miners.TripletMarginMiner()
             )
         trloss = test(model, device, train_loader, "train data")
         vloss = test(model, device, val_loader, "val data")
