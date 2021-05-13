@@ -85,10 +85,11 @@ class TripletZebras(torch.utils.data.Dataset):
 
         return (anchor_path, positive_path, negative_path)
 
-def get_loader(root, json, transform, batch_size, shuffle=True, num_workers=4):
+def get_loader(root, json, transform, batch_size, shuffle=True, num_workers=4, num_triplets=100*1000):
     zebra_triplets = TripletZebras(root=root,
         json=json,
-        transform=transform
+        transform=transform,
+        num_triplets=num_triplets,
     )
 
     # Data loader for COCO dataset

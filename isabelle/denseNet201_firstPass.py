@@ -126,7 +126,8 @@ def main():
         args.val_json,
         transforms,
         batch_size=args.batch_size,
-        shuffle=True
+        shuffle=True,
+        num_triplets=3000,
     )
 
     # object recognition, pretrained on imagenet
