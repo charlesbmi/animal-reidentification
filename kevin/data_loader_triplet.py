@@ -35,7 +35,8 @@ class TripletZebras(torch.utils.data.Dataset):
         triplets = []
         for i in tqdm(np.arange(num_triplets)):
             triplets.append(self.generate_triplet(anchors, unique_zebra_names))
-        triplets = list(set(triplets))
+        # Remove duplicates
+        triplets = np.unique(triplets, axis=-1)
 
         self.triplets = triplets
         self.transform = transform
@@ -126,6 +127,7 @@ def main():
             default=None,
             help='output path to dump positive/negative')
     args = parser.parse_args()
+    np.random.seed(args.random_seed)
 
     transforms = transforms.Compose([
         transforms.Resize([500, 750]),
