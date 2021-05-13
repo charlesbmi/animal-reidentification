@@ -29,9 +29,8 @@ class TripletZebras(torch.utils.data.Dataset):
 
         zebra_annotations = [ann for ann in self.annotations if ann['category_id'] == 1]
         zebra_names = [ann['name'] for ann in zebra_annotations]
-        unique_zebra_names = np.unique(zebra_names)
-        zebra_names_counts = np.unique(zebra_names, return_counts=True)
-        anchors = zebra_names_counts[0][np.where(zebra_names_counts[1] > 1)]
+        unique_zebra_names, zebra_names_counts = np.unique(zebra_names, return_counts=True)
+        anchors = unique_zebra_names[np.where(zebra_names_counts > 1)]
 
         triplets = []
         for i in tqdm(np.arange(num_triplets)):
@@ -108,6 +107,7 @@ def main():
     # These packages are only necessary for this test, so we import here
     import argparse
     import torchvision.transforms as transforms
+    import pandas as pd
 
     parser = argparse.ArgumentParser(description='test data_loader')
     parser.add_argument('-i', '--images', type=pathlib.Path,
@@ -116,13 +116,29 @@ def main():
     parser.add_argument('-j', '--json', type=pathlib.Path,
             required=True,
             help='Annotations JSON file in COCO-format')
+    parser.add_argument('-s', '--random-seed', type=int,
+            default=21,
+            help='random seed for consistency')
+    parser.add_argument('-n', '--num-triplets', type=int,
+            default=1000,
+            help='number of triplets to generate')
+    parser.add_argument('-o', '--output-csv', type=str,
+            default=None,
+            help='output path to dump positive/negative')
     args = parser.parse_args()
 
     transforms = transforms.Compose([
         transforms.Resize([500, 750]),
         transforms.ToTensor(),
     ])
-    data_loader = get_loader(args.images, args.json, transforms, batch_size=4, shuffle=False)
+    data_loader = get_loader(
+        args.images,
+        args.json,
+        transforms,
+        batch_size=4,
+        shuffle=False,
+        num_triplets=args.num_triplets
+    )
 
     # Print single element from the data loader
 #     for img1, img2, img3 in data_loader:
@@ -131,6 +147,11 @@ def main():
 #         plt.imshow(img3[0].permute(1, 2, 0))
 #         plt.show()
 #         break
+
+    # Dump triplets to csv
+    if args.output_csv:
+        triplets = pd.DataFrame(data_loader.dataset.triplets, columns=['anchor', 'positive', 'negative'])
+        triplets.to_csv(args.output_csv, index=False)
 
     return
 
