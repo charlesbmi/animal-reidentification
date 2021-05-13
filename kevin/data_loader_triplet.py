@@ -44,7 +44,7 @@ class TripletZebras(torch.utils.data.Dataset):
     def __getitem__(self, index):
         """Returns triplet of images"""
         
-        anchor_path, positive_path, negative_path = self.triplets[index]
+        anchor_annotation, positive_annotation, negative_annotation = self.triplets[index]
         
         img1 = Image.open(os.path.join(self.root, anchor_path)).convert('RGB')
         img2 = Image.open(os.path.join(self.root, positive_path)).convert('RGB')
@@ -66,24 +66,21 @@ class TripletZebras(torch.utils.data.Dataset):
 
     def generate_triplet(self, anchors, unique_zebra_names):
         anchor_zebra_name = np.random.choice(anchors, replace=True)
-        anchor_img_ids = [ann['image_id'] for ann in self.annotations if ann['name']==anchor_zebra_name]
-        anchor_file_names = [img['file_name'] for img in self.images if img['id'] in anchor_img_ids]
+        # Get annotations (ie, bounding boxes) associated with this individual
+        anchor_all_annotations = [ann for ann in self.annotations if ann['name'] == anchor_zebra_name]
 
-        anchor_path = np.random.choice(anchor_file_names, replace=False)
+        # Pick 2 images to be anchor oand positive
+        anchor_annotation, positive_annotation = np.random.choice(anchor_all_annotations, size=2, replace=False)
 
-        positive_path = anchor_path
-        while positive_path == anchor_path:
-            positive_path = np.random.choice(anchor_file_names, replace=False)
+        print(anchor_annotation['id'], positive_annotation['id'])
 
-        neg_zebra_name = anchor_zebra_name
-        while neg_zebra_name == anchor_zebra_name:
-            neg_zebra_name = np.random.choice(unique_zebra_names, replace=False)
+        # Pick a zebra individual that is NOT our anchor/positive
+        other_zebra_names = np.setdiff1d(unique_zebra_names, anchor_zebra_name)
+        neg_zebra_name = np.random.choice(other_zebra_names, replace=False)
+        negative_all_annotations = [ann for ann in self.annotations if ann['name'] == neg_zebra_name]
+        negative_annotation = np.random.choice(negative_all_annotations, replace=False)
 
-        neg_img_ids = [ann['image_id'] for ann in self.annotations if ann['name']==neg_zebra_name]
-        neg_file_names = [img['file_name'] for img in self.images if img['id'] in neg_img_ids]
-        negative_path = np.random.choice(neg_file_names, replace=False)
-
-        return (anchor_path, positive_path, negative_path)
+        return (anchor_annotation, positive_annotation, negative_annotation)
 
 def get_loader(root, json, transform, batch_size, shuffle=True, num_workers=4, num_triplets=100*1000):
     zebra_triplets = TripletZebras(root=root,
