@@ -13,7 +13,7 @@ from tqdm import tqdm
 
 class TripletZebras(torch.utils.data.Dataset):
     """COCO Custom Dataset compatible with torch.utils.data.DataLoader."""
-    def __init__(self, root, json, transform=None):
+    def __init__(self, root, json, transform=None, num_triplets=100*1000):
         """Set the path for images and annotations.
 
         Args:
@@ -34,7 +34,7 @@ class TripletZebras(torch.utils.data.Dataset):
         anchors = zebra_names_counts[0][np.where(zebra_names_counts[1] > 1)]
 
         triplets = []
-        for i in tqdm(np.arange(100)):
+        for i in tqdm(np.arange(num_triplets)):
             triplets.append(self.generate_triplet(anchors, unique_zebra_names))
         triplets = list(set(triplets))
 
