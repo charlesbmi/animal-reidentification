@@ -95,18 +95,18 @@ def main():
     parser.add_argument('--batch-size', type=int, default=64,
                         help='Training batch size')
     # It might be helpful to split data_folder into separate arguments for train/val/test
-    parser.add_argument('--data-folder', required=True,
+    parser.add_argument('--data-folder',
                         # For AWS, get path from folder
                         default=os.environ.get('SM_CHANNEL_DATA'),
                         help='folder containing data images')
-    parser.add_argument('--train-json', required=True,
+    parser.add_argument('--train-json',
                         # For AWS, get path from folder
                         default=os.path.join(
                             os.environ.get('SM_CHANNEL_ANNOTATIONS', ''),
                             'customSplit_train.json'
                         ),
                         help='JSON with COCO-format annotations for training dataset')
-    parser.add_argument('--val-json', required=True,
+    parser.add_argument('--val-json',
                         # For AWS, get path from folder
                         default=os.path.join(
                             os.environ.get('SM_CHANNEL_ANNOTATIONS', ''),
