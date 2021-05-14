@@ -102,6 +102,8 @@ def main():
                         help='JSON with COCO-format annotations for validation dataset')
     parser.add_argument('--batch-log-interval', type=int, default=10,
                         help='Number of batches to run each epoch before logging metrics.')
+    parser.add_argument('--num-train-triplets', type=int, default=10*1000,
+                        help='Number of triplets to generate for each training epoch.')
     args = parser.parse_args()
     use_cuda = not args.no_cuda and torch.cuda.is_available()
 
@@ -124,7 +126,7 @@ def main():
         transforms,
         batch_size=args.batch_size,
         shuffle=True,
-        num_triplets=10000,
+        num_triplets=args.num_train_triplets,
     )
     val_loader = data_loader.get_loader(
         args.data_folder,
@@ -132,7 +134,7 @@ def main():
         transforms,
         batch_size=args.batch_size,
         shuffle=True,
-        num_triplets=1500,
+        num_triplets=int(0.15 * args.num_train_triplets),
     )
 
     # object recognition, pretrained on imagenet
