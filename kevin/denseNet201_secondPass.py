@@ -51,18 +51,18 @@ def test(model, device, test_loader, dataName):
             anchor_emb = model(img1)
             positive_emb = model(img2)
             negative_emb = model(img3) 
-            # TO DO: function that takes output and turns into anchor, positive, negative
+            # function that takes output and turns into anchor, positive, negative
             test_loss += F.triplet_margin_loss(anchor_emb, positive_emb, negative_emb, margin=1.0, p=2) # sum up batch loss
-            # pull the predicted matches from the output
-            # pred = output.argmax(dim=1, keepdim=True)  # get the index of the max log-probability
-            # correct += pred.eq(labels.view_as(pred)).sum().item()
-            #test_num += len(data)
+            for i, anc in enumerate(anchor_emb):
+                if np.linalg.norm(anc.cpu() - positive_emb.cpu()[i])<np.linalg.norm(anc.cpu() - negative_emb.cpu()[i]):
+                    correct += 1
+            test_num += len(anchor_emb)
 
-    #test_loss /= test_num
+    test_loss /= test_num
 
-    # print('\n' + dataName + ' tested: Average loss: {:.4f}, Accuracy: {}/{} ({:.0f}%)\n'.format(
-    #     test_loss, correct, test_num,
-    #     100. * correct / test_num))
+    print('\n' + dataName + ' tested: Average loss: {:.4f}, Accuracy: {}/{} ({:.0f}%)\n'.format(
+        test_loss, correct, test_num,
+        100. * correct / test_num))
 
 
     return test_loss #, correct, test_num
@@ -123,14 +123,16 @@ def main():
         args.train_json,
         transforms,
         batch_size=args.batch_size,
-        shuffle=True
+        shuffle=True,
+        num_triplets=1000,
     )
     val_loader = data_loader.get_loader(
         args.data_folder,
         args.val_json,
         transforms,
         batch_size=args.batch_size,
-        shuffle=True
+        shuffle=True,
+        num_triplets=700,
     )
 
     # object recognition, pretrained on imagenet
