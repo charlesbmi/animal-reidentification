@@ -104,8 +104,11 @@ def main():
                         help='Number of batches to run each epoch before logging metrics.')
     parser.add_argument('--num-train-triplets', type=int, default=10*1000,
                         help='Number of triplets to generate for each training epoch.')
+    parser.add_argument('--use-seg',action='store_true', default=False,
+                        help='For using semantic segmentations')
     args = parser.parse_args()
     use_cuda = not args.no_cuda and torch.cuda.is_available()
+    use_seg = args.use_seg
 
     np.random.seed(2021)  # to ensure you always get the same train/test split
     torch.manual_seed(args.seed)
@@ -127,6 +130,7 @@ def main():
         batch_size=args.batch_size,
         shuffle=True,
         num_triplets=args.num_train_triplets,
+        apply_mask=use_seg,
     )
     val_loader = data_loader.get_loader(
         args.data_folder,
@@ -135,6 +139,7 @@ def main():
         batch_size=args.batch_size,
         shuffle=True,
         num_triplets=int(0.15 * args.num_train_triplets),
+        apply_mask=use_seg,
     )
 
     # object recognition, pretrained on imagenet
