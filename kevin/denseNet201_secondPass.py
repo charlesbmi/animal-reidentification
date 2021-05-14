@@ -124,7 +124,7 @@ def main():
         transforms,
         batch_size=args.batch_size,
         shuffle=True,
-        num_triplets=1000,
+        num_triplets=10000,
     )
     val_loader = data_loader.get_loader(
         args.data_folder,
@@ -132,7 +132,7 @@ def main():
         transforms,
         batch_size=args.batch_size,
         shuffle=True,
-        num_triplets=700,
+        num_triplets=1500,
     )
 
     # object recognition, pretrained on imagenet
@@ -157,8 +157,8 @@ def main():
         valLoss.append(vloss)
         scheduler.step()  # learning rate scheduler
 
-    if args.save_model:
-            torch.save(model.state_dict(), args.name + "_model.pt")
+        if args.save_model:
+                torch.save(model.state_dict(), args.name + "_model.pt")
 
     # plot training and validation loss by epoch
     f = plt.figure(figsize=(6, 5))
