@@ -1,11 +1,17 @@
 import json
 import numpy as np
 import os
+import argparse
 
 np.random.seed(21)
 
+parser = argparse.ArgumentParser()
+parser.add_argument('-a', '--annotations', required=True)
+parser.add_argument('-o', '--output-dir', required=True)
+args = parser.parse_args()
+
 # load the annotations
-BOX_ANNOTATION_FILE = '/media/data/ComputerVisionCourse/zebragiraffe/labels.json'
+BOX_ANNOTATION_FILE = args.annotations
 with open(BOX_ANNOTATION_FILE) as f:
     data_orig = json.load(f)
 f.close()
@@ -99,7 +105,7 @@ print(len(data_test['annotations']))
 print(totalAnns)
 
 # save out the new jsons
-new_data_path = '/media/data/ComputerVisionCourse/zebragiraffe/annotations/'
+new_data_path = args.output_dir
 os.makedirs(new_data_path, exist_ok=True) # create directory if needed
 
 with open(new_data_path + 'customSplit_train.json', 'w') as outfile:
