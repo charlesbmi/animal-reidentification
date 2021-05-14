@@ -6,6 +6,8 @@ np.random.seed(21)
 
 # load the annotations
 BOX_ANNOTATION_FILE = '../../Data/gzgc.coco/annotations/instances_train2020.json'
+# annotations with segmentations
+BOX_ANNOTATION_FILE = '../../Data/gzgc.coco/masks/instances_train2020_maskrcnn.json'
 with open(BOX_ANNOTATION_FILE) as f:
     data_orig = json.load(f)
 f.close()
@@ -102,13 +104,13 @@ print(totalAnns)
 new_data_path = '../../Data/gzgc.coco/annotations/'
 os.makedirs(new_data_path, exist_ok=True) # create directory if needed
 
-with open(new_data_path + 'customSplit_train.json', 'w') as outfile:
+with open(new_data_path + 'customSplit_seg_train.json', 'w') as outfile:
     json.dump(data_train, outfile, indent = 4, ensure_ascii = False)
 
-with open(new_data_path + 'customSplit_val.json', 'w') as outfile:
+with open(new_data_path + 'customSplit_seg_val.json', 'w') as outfile:
     json.dump(data_val, outfile, indent = 4, ensure_ascii = False)
 
-with open(new_data_path + 'customSplit_test.json', 'w') as outfile:
+with open(new_data_path + 'customSplit_seg_test.json', 'w') as outfile:
     json.dump(data_test, outfile, indent = 4, ensure_ascii = False)
 
 #6286

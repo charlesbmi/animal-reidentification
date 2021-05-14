@@ -111,14 +111,35 @@ def main():
     args = parser.parse_args()
     use_cuda = not args.no_cuda and torch.cuda.is_available()
     use_seg = args.use_seg
-
+    print('use seg')
+    print(use_seg)
     np.random.seed(2021)  # to ensure you always get the same train/test split
     torch.manual_seed(args.seed)
     device = torch.device("cuda" if use_cuda else "cpu")
     kwargs = {'num_workers': 1, 'pin_memory': True} if use_cuda else {}
 
     if args.evaluate:
+        print('EVALUATING MODEL')
         # generate some plots, don't actually train the model
+        modelName = args.name + '_model.pt'
+        model = initialize_model(use_pretrained=True, l1Units = 500, l2Units=128)
+        model = model.to(device)
+        model.load_state_dict(torch.load(modelName))
+
+        transforms = torchvision.transforms.Compose([
+            torchvision.transforms.Resize([500, 750]),  # Some images are slightly different sizes
+            torchvision.transforms.ToTensor(),
+        ])
+
+        val_loader = data_loader.get_loader(
+            args.data_folder,
+            args.val_json,
+            transforms,
+            batch_size=args.batch_size,
+            shuffle=True,
+            num_triplets=int(0.15 * args.num_train_triplets),
+            apply_mask=use_seg,
+        )
 
         return
 

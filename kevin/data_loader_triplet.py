@@ -68,9 +68,10 @@ class TripletZebras(torch.utils.data.Dataset):
             if self.mask==True:
                 mask = mask_util.decode(annotation['maskrcnn_mask_rle'])
                 segImage = image.copy()
+                segImage  = np.array(segImage)
                 binaryMask = (mask > 0.5).astype(np.float32)
                 segImage[np.where(binaryMask == 0.0)] = 0
-                image = segImage
+                image = Image.fromarray(np.uint8(segImage)).convert('RGB')
             
             # Transform to tensor
             if self.transform:
