@@ -8,6 +8,7 @@ import torch.optim as optim
 import data_loader_triplet as data_loader
 from torch.optim.lr_scheduler import StepLR
 import matplotlib.pyplot as plt
+import os
 
 def initialize_model(use_pretrained=True, l1Units = 500, l2Units=128):
 
@@ -95,10 +96,22 @@ def main():
                         help='Training batch size')
     # It might be helpful to split data_folder into separate arguments for train/val/test
     parser.add_argument('--data-folder', required=True,
+                        # For AWS, get path from folder
+                        default=os.environ.get('SM_CHANNEL_DATA'),
                         help='folder containing data images')
     parser.add_argument('--train-json', required=True,
+                        # For AWS, get path from folder
+                        default=os.path.join(
+                            os.environ.get('SM_CHANNEL_ANNOTATIONS', ''),
+                            'customSplit_train.json'
+                        ),
                         help='JSON with COCO-format annotations for training dataset')
     parser.add_argument('--val-json', required=True,
+                        # For AWS, get path from folder
+                        default=os.path.join(
+                            os.environ.get('SM_CHANNEL_ANNOTATIONS', ''),
+                            'customSplit_val.json'
+                        ),
                         help='JSON with COCO-format annotations for validation dataset')
     parser.add_argument('--batch-log-interval', type=int, default=10,
                         help='Number of batches to run each epoch before logging metrics.')
