@@ -100,11 +100,12 @@ class TripletZebras(torch.utils.data.Dataset):
 
         return (anchor_annotation_id, positive_annotation_id, negative_annotation_id)
 
-def get_loader(root, json, transform, batch_size, shuffle=True, num_workers=4, num_triplets=100*1000):
+def get_loader(root, json, transform, batch_size, shuffle=True, num_workers=4, num_triplets=100*1000, apply_mask=False):
     zebra_triplets = TripletZebras(root=root,
         json=json,
         transform=transform,
         num_triplets=num_triplets,
+        apply_mask=apply_mask
     )
 
     # Data loader for COCO dataset
@@ -141,6 +142,9 @@ def main():
     parser.add_argument('-o', '--output-csv', type=str,
             default=None,
             help='output path to dump positive/negative')
+    parser.add_argument('-m', '--apply_mask', type=bool,
+        default=False,
+        help='apply segmentation mask to the image')
     args = parser.parse_args()
     np.random.seed(args.random_seed)
 
@@ -154,7 +158,8 @@ def main():
         transforms,
         batch_size=4,
         shuffle=False,
-        num_triplets=args.num_triplets
+        num_triplets=args.num_triplets,
+        apply_mask=args.apply_mask
     )
 
     # Print single element from the data loader
