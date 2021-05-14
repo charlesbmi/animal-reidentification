@@ -7,13 +7,14 @@ import os.path
 import pathlib
 from PIL import Image
 from pycocotools.coco import COCO
+import pycocotools.mask as mask_util
 import numpy as np
 import matplotlib.pyplot as plt
 from tqdm import tqdm
 
 class TripletZebras(torch.utils.data.Dataset):
     """COCO Custom Dataset compatible with torch.utils.data.DataLoader."""
-    def __init__(self, root, json, transform=None, num_triplets=100*1000):
+    def __init__(self, root, json, transform=None, num_triplets=100*1000, apply_mask=False):
         """Set the path for images and annotations.
 
         Args:
@@ -26,10 +27,11 @@ class TripletZebras(torch.utils.data.Dataset):
         coco = COCO(json)
         self.annotations = coco.anns
         self.images = coco.imgs
-
+        self.mask = apply_mask
+        
         zebra_annotations = [ann for ann in self.annotations.values() if ann['category_id'] == 1]
         zebra_names = [ann['name'] for ann in zebra_annotations]
-        unique_zebra_names, zebra_names_counts = np.unique(zebra_names, return_counts=True)
+        unique_zebra_names, zebra_names_counts = np.unique(zebra_names, return_counts=True) # numpy arrays
         anchors = unique_zebra_names[np.where(zebra_names_counts > 1)]
 
         # Generate triplets of annotation IDs (keys into self.annotations dictionary)
@@ -37,7 +39,7 @@ class TripletZebras(torch.utils.data.Dataset):
         for i in tqdm(np.arange(num_triplets)):
             triplets.append(self.generate_triplet(anchors, unique_zebra_names))
         # Remove duplicates
-        triplets = np.unique(triplets, axis=0)
+        triplets = np.unique(triplets, axis=0).tolist()
 
         self.triplets = triplets
         self.transform = transform
@@ -61,7 +63,15 @@ class TripletZebras(torch.utils.data.Dataset):
 
             # Load image
             image = Image.open(image_path).convert('RGB')
-
+            
+            # Apply segmentation mask
+            if self.mask==True:
+                mask = mask_util.decode(annotation['maskrcnn_mask_rle'])
+                segImage = image.copy()
+                binaryMask = (mask > 0.5).astype(np.float32)
+                segImage[np.where(binaryMask == 0.0)] = 0
+                image = segImage
+            
             # Transform to tensor
             if self.transform:
                 image = self.transform(image)
