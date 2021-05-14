@@ -106,6 +106,8 @@ def main():
                         help='Number of triplets to generate for each training epoch.')
     parser.add_argument('--use-seg',action='store_true', default=False,
                         help='For using semantic segmentations')
+    parser.add_argument('--evaluate', action='store_true', default = False,
+                        help='For evaluating model performance after training')
     args = parser.parse_args()
     use_cuda = not args.no_cuda and torch.cuda.is_available()
     use_seg = args.use_seg
@@ -114,6 +116,11 @@ def main():
     torch.manual_seed(args.seed)
     device = torch.device("cuda" if use_cuda else "cpu")
     kwargs = {'num_workers': 1, 'pin_memory': True} if use_cuda else {}
+
+    if args.evaluate:
+        # generate some plots, don't actually train the model
+
+        return
 
     # TODO: update these (placeholder) transforms
     # Also, we may need different transforms for train/val
