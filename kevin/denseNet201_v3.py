@@ -53,10 +53,11 @@ def test(model, device, test_loader, dataName):
             negative_emb = model(img3) 
             # function that takes output and turns into anchor, positive, negative
             test_loss += F.triplet_margin_loss(anchor_emb, positive_emb, negative_emb, margin=1.0, p=2) # sum up batch loss
-            for i, anc in enumerate(anchor_emb):
-                if np.linalg.norm(anc.cpu() - positive_emb.cpu()[i])<np.linalg.norm(anc.cpu() - negative_emb.cpu()[i]):
-                    correct += 1
-            test_num += len(anchor_emb)
+
+            predict_match = torch.linalg.norm(anchor - positive_emb, dim=-1) < torch.linalg.norm(anchor - negative_emb, dim=-1)
+
+            correct += predict_match.sum()
+            test_num += len(predict_match)
 
     test_loss /= test_num
 
@@ -173,7 +174,7 @@ def main():
     # object recognition, pretrained on imagenet
     # https://pytorch.org/hub/pytorch_vision_densenet/
     model = initialize_model(use_pretrained=True, l1Units = 500, l2Units=128)
-    # print(model)
+    print('Converting model to device:', device)
     model = model.to(device)
     # Try different optimzers here [Adam, SGD, RMSprop]
     optimizer = optim.Adam(model.parameters(), lr=args.lr, weight_decay = args.weight_decay)
