@@ -8,6 +8,12 @@ import torch.optim as optim
 import data_loader_triplet as data_loader
 from torch.optim.lr_scheduler import StepLR
 import matplotlib.pyplot as plt
+import logging
+
+logging.basicConfig(
+        format='%(asctime)s %(levelname)-8s %(message)s',
+        level=logging.INFO,
+        datefmt='%H:%M:%S')
 
 def initialize_model(use_pretrained=True, l1Units = 500, l2Units=128):
 
@@ -36,7 +42,7 @@ def train(args, model, device, train_loader, optimizer, epoch):
         loss.backward()  # Gradient computation
         optimizer.step()  # Perform a single optimization step
         if batch_idx % args.batch_log_interval == 0:
-            print('Train Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}'.format(
+            logging.info('Train Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}'.format(
                 epoch, batch_idx * len(img1), len(train_loader.sampler),
                        100. * batch_idx / len(train_loader), loss.item()))
 
@@ -61,7 +67,7 @@ def test(model, device, test_loader, dataName):
 
     test_loss /= test_num
 
-    print('\n' + dataName + ' tested: Average loss: {:.4f}, Accuracy: {}/{} ({:.0f}%)\n'.format(
+    logging.info('\n' + dataName + ' tested: Average loss: {:.4f}, Accuracy: {}/{} ({:.0f}%)\n'.format(
         test_loss, correct, test_num,
         100. * correct / test_num))
 
@@ -112,8 +118,7 @@ def main():
     args = parser.parse_args()
     use_cuda = not args.no_cuda and torch.cuda.is_available()
     use_seg = args.use_seg
-    print('use seg')
-    print(use_seg)
+    logging.info('use seg? {}'.format(use_seg))
     np.random.seed(2021)  # to ensure you always get the same train/test split
     torch.manual_seed(args.seed)
     device = torch.device("cuda" if use_cuda else "cpu")
@@ -174,7 +179,7 @@ def main():
     # object recognition, pretrained on imagenet
     # https://pytorch.org/hub/pytorch_vision_densenet/
     model = initialize_model(use_pretrained=True, l1Units = 500, l2Units=128)
-    print('Converting model to device:', device)
+    logging.debug('Converting model to device:', device)
     model = model.to(device)
     # Try different optimzers here [Adam, SGD, RMSprop]
     optimizer = optim.Adam(model.parameters(), lr=args.lr, weight_decay = args.weight_decay)
