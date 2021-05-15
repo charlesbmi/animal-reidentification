@@ -78,7 +78,7 @@ def main():
     # Training settings
     # Use the command line to modify the default settings
     parser = argparse.ArgumentParser(description='TripNet: a network for ReID')
-    parser.add_argument('--name',
+    parser.add_argument('--name', default='model',
                         help="what you want to name this model save file")
     parser.add_argument('--epochs', type=int, default=14, metavar='N',
                         help='number of epochs to train (default: 14)')
