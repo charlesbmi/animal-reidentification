@@ -60,7 +60,7 @@ def test(model, device, test_loader, dataName):
             # function that takes output and turns into anchor, positive, negative
             test_loss += F.triplet_margin_loss(anchor_emb, positive_emb, negative_emb, margin=1.0, p=2) # sum up batch loss
 
-            predict_match = torch.linalg.norm(anchor - positive_emb, dim=-1) < torch.linalg.norm(anchor - negative_emb, dim=-1)
+            predict_match = torch.linalg.norm(anchor_emb - positive_emb, dim=-1) < torch.linalg.norm(anchor_emb - negative_emb, dim=-1)
 
             correct += predict_match.sum()
             test_num += len(predict_match)
@@ -70,7 +70,6 @@ def test(model, device, test_loader, dataName):
     logging.info('\n' + dataName + ' tested: Average loss: {:.4f}, Accuracy: {}/{} ({:.0f}%)\n'.format(
         test_loss, correct, test_num,
         100. * correct / test_num))
-
 
     return test_loss #, correct, test_num
 
