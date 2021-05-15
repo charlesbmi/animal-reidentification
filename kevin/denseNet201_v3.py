@@ -62,7 +62,7 @@ def test(model, device, test_loader, dataName):
 
             predict_match = torch.linalg.norm(anchor_emb - positive_emb, dim=-1) < torch.linalg.norm(anchor_emb - negative_emb, dim=-1)
 
-            correct += predict_match.sum()
+            correct += predict_match.sum().item()
             test_num += len(predict_match)
 
     test_loss /= test_num
