@@ -12,17 +12,11 @@ import json
 from sklearn.manifold import TSNE
 from PIL import Image
 import pycocotools.mask as mask_util
-import logging
-
-logging.basicConfig(
-        format='%(asctime)s %(levelname)-8s %(message)s',
-        level=logging.INFO,
-        datefmt='%H:%M:%S')
 
 
 def initialize_model(use_pretrained=True, l1Units = 500, l2Units=128):
 
-    model = torch.hub.load('pytorch/vision:v0.9.0', 'densenet121', pretrained=use_pretrained)
+    model = torch.hub.load('pytorch/vision:v0.9.0', 'densenet201', pretrained=use_pretrained)
     for param in model.parameters():
         param.requires_grad = False  # because these layers are pretrained
     # change the final layer to be a bottle neck of two layers
@@ -47,7 +41,7 @@ def train(args, model, device, train_loader, optimizer, epoch):
         loss.backward()  # Gradient computation
         optimizer.step()  # Perform a single optimization step
         if batch_idx % args.batch_log_interval == 0:
-            logging.info('Train Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}'.format(
+            print('Train Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}'.format(
                 epoch, batch_idx * len(img1), len(train_loader.sampler),
                        100. * batch_idx / len(train_loader), loss.item()))
 
@@ -64,12 +58,17 @@ def test(model, device, test_loader, dataName):
             negative_emb = model(img3) 
             # function that takes output and turns into anchor, positive, negative
             test_loss += F.triplet_margin_loss(anchor_emb, positive_emb, negative_emb, margin=1.0, p=2) # sum up batch loss
+            for i, anc in enumerate(anchor_emb):
+                if np.linalg.norm(anc.cpu() - positive_emb.cpu()[i])<np.linalg.norm(anc.cpu() - negative_emb.cpu()[i]):
+                    correct += 1
+            test_num += len(anchor_emb)
 
     test_loss /= test_num
 
-    logging.info('\n' + dataName + ' tested: Average loss: {:.4f}, Accuracy: {}/{} ({:.0f}%)\n'.format(
+    print('\n' + dataName + ' tested: Average loss: {:.4f}, Accuracy: {}/{} ({:.0f}%)\n'.format(
         test_loss, correct, test_num,
         100. * correct / test_num))
+
 
     return test_loss #, correct, test_num
 
@@ -77,7 +76,7 @@ def main():
     # Training settings
     # Use the command line to modify the default settings
     parser = argparse.ArgumentParser(description='TripNet: a network for ReID')
-    parser.add_argument('--name', default='model',
+    parser.add_argument('--name',
                         help="what you want to name this model save file")
     parser.add_argument('--epochs', type=int, default=14, metavar='N',
                         help='number of epochs to train (default: 14)')
@@ -117,7 +116,8 @@ def main():
     args = parser.parse_args()
     use_cuda = not args.no_cuda and torch.cuda.is_available()
     use_seg = args.use_seg
-    logging.info('use seg? {}'.format(use_seg))
+    print('use seg')
+    print(use_seg)
     np.random.seed(2021)  # to ensure you always get the same train/test split
     torch.manual_seed(args.seed)
     device = torch.device("cuda" if use_cuda else "cpu")
