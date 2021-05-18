@@ -14,7 +14,7 @@ from tqdm import tqdm
 
 class TripletZebras(torch.utils.data.Dataset):
     """COCO Custom Dataset compatible with torch.utils.data.DataLoader."""
-    def __init__(self, root, json, transform=None, num_triplets=100*1000, apply_mask=False):
+    def __init__(self, root, json, transform=None, num_triplets=100*1000, apply_mask=False, apply_mask_bbox=False):
         """Set the path for images and annotations.
 
         Args:
@@ -28,6 +28,7 @@ class TripletZebras(torch.utils.data.Dataset):
         self.annotations = coco.anns
         self.images = coco.imgs
         self.mask = apply_mask
+        self.mask_bbox = apply_mask_bbox
         
         zebra_annotations = [ann for ann in self.annotations.values() if ann['category_id'] == 1]
         zebra_names = [ann['name'] for ann in zebra_annotations]
@@ -72,7 +73,28 @@ class TripletZebras(torch.utils.data.Dataset):
                 binaryMask = (mask > 0.5).astype(np.float32)
                 segImage[np.where(binaryMask == 0.0)] = 0
                 image = Image.fromarray(np.uint8(segImage)).convert('RGB')
-            
+
+            if self.mask_bbox:
+                # Top-left, bottom-right coordinates
+                bbox_tlbr = annotation['bbox_tlbr']
+                # bbox_tlbr = annotation['bbox']
+                x_tl, y_tl, x_br, y_br = bbox_tlbr
+                # Round partial pixels as necessary
+                x_tl = int(np.floor(x_tl))
+                y_tl = int(np.floor(y_tl))
+                x_br = int(np.ceil(x_br))
+                y_br = int(np.ceil(y_br))
+
+                image_arr = np.array(image)
+
+                # Zero out outside the bounding boxes
+                image_arr[:y_tl,:,:] = 0
+                image_arr[:,:x_tl,:] = 0
+                image_arr[y_br:,:,:] = 0
+                image_arr[:,x_br:,:] = 0
+
+                image = Image.fromarray(np.uint8(image_arr)).convert('RGB')
+
             # Transform to tensor
             if self.transform:
                 image = self.transform(image)
@@ -101,12 +123,13 @@ class TripletZebras(torch.utils.data.Dataset):
 
         return (anchor_annotation_id, positive_annotation_id, negative_annotation_id)
 
-def get_loader(root, json, transform, batch_size, shuffle=True, num_workers=4, num_triplets=100*1000, apply_mask=False):
+def get_loader(root, json, transform, batch_size, shuffle=True, num_workers=4, num_triplets=100*1000, apply_mask=False, apply_mask_bbox=False):
     zebra_triplets = TripletZebras(root=root,
         json=json,
         transform=transform,
         num_triplets=num_triplets,
-        apply_mask=apply_mask
+        apply_mask=apply_mask,
+        apply_mask_bbox=apply_mask_bbox
     )
 
     # Data loader for COCO dataset
@@ -146,6 +169,9 @@ def main():
     parser.add_argument('-m', '--apply_mask', type=bool,
         default=False,
         help='apply segmentation mask to the image')
+    parser.add_argument('-b', '--apply_mask_bbox', action='store_true',
+        default=False,
+        help='mask out bounding box from the image')
     args = parser.parse_args()
     np.random.seed(args.random_seed)
 
@@ -160,16 +186,20 @@ def main():
         batch_size=4,
         shuffle=False,
         num_triplets=args.num_triplets,
-        apply_mask=args.apply_mask
+        apply_mask=args.apply_mask,
+        apply_mask_bbox=args.apply_mask_bbox
     )
 
     # Print single element from the data loader
-#     for img1, img2, img3 in data_loader:
-#         plt.imshow(img1[0].permute(1, 2, 0))
-#         plt.imshow(img2[0].permute(1, 2, 0))
-#         plt.imshow(img3[0].permute(1, 2, 0))
-#         plt.show()
-#         break
+    for img1, img2, img3 in data_loader:
+        plt.figure()
+        plt.imshow(img1[0].permute(1, 2, 0))
+        plt.figure()
+        plt.imshow(img2[0].permute(1, 2, 0))
+        plt.figure()
+        plt.imshow(img3[0].permute(1, 2, 0))
+        plt.show()
+        break
 
     # Dump triplets to csv
     if args.output_csv:
