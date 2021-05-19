@@ -9,19 +9,24 @@ import data_loader_triplet_v2 as data_loader
 from torch.optim.lr_scheduler import StepLR
 import matplotlib.pyplot as plt
 from matplotlib import cm
+import os
 import json
 from sklearn.manifold import TSNE
 
 
-def initialize_model(use_pretrained=True, l1Units = 500, l2Units=128):
+def initialize_model(use_pretrained=True, l1Units = 512, l2Units=128):
 
     model = torch.hub.load('pytorch/vision:v0.9.0', 'densenet201', pretrained=use_pretrained)
     for param in model.parameters():
         param.requires_grad = False  # because these layers are pretrained
     # change the final layer to be a bottle neck of two layers
     extracted_features_size = model.classifier.in_features
-    model.classifier = nn.Sequential(nn.Linear(extracted_features_size, l1Units), nn.Linear(l1Units,
-                                                                     l2Units))  # assuming that the fc7 layer has 512 neurons, otherwise change it
+    model.classifier = nn.Sequential(
+            nn.Linear(extracted_features_size, l1Units),
+            nn.BatchNorm1d(l1Units),
+            nn.ReLU(),
+            nn.Linear(l1Units, l2Units)
+            )
     return model
 
 def train(args, model, device, train_loader, optimizer, epoch):
@@ -30,18 +35,20 @@ def train(args, model, device, train_loader, optimizer, epoch):
     trained for 1 epoch.
     '''
     model.train()  # Set the model to training mode
-    for batch_idx, (img1, img2, img3), (ann1, ann2, ann3) in enumerate(train_loader):
-        img1, img2, img3 = img1.to(device), img2.to(device), img3.to(device)
+    for batch_idx, batch in enumerate(train_loader):
+        anchor_positive_negative_imgs, anchor_positive_negative_anns = batch
+        anchor_img, positive_img, negative_img = anchor_positive_negative_imgs
+        anchor_img, positive_img, negative_img = anchor_img.to(device), positive_img.to(device), negative_img.to(device)
         optimizer.zero_grad()  # Clear the gradient
-        anchor_emb = model(img1)
-        positive_emb = model(img2)
-        negative_emb = model(img3) 
+        anchor_emb = model(anchor_img)
+        positive_emb = model(positive_img)
+        negative_emb = model(negative_img)
         loss = F.triplet_margin_loss(anchor_emb, positive_emb, negative_emb, margin=1.0, p=2)  # sum up batch loss
         loss.backward()  # Gradient computation
         optimizer.step()  # Perform a single optimization step
         if batch_idx % args.batch_log_interval == 0:
             print('Train Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}'.format(
-                epoch, batch_idx * len(img1), len(train_loader.sampler),
+                epoch, batch_idx * len(anchor_img), len(train_loader.sampler),
                        100. * batch_idx / len(train_loader), loss.item()))
 
 def test(model, device, test_loader, dataName):
@@ -50,17 +57,20 @@ def test(model, device, test_loader, dataName):
     correct = 0 # number of times it gets the distances correct
     test_num = 0
     with torch.no_grad():  # For the inference step, gradient is not computed
-        for (img1, img2, img3), (ann1, ann2, ann3) in test_loader:
-            img1, img2, img3 = img1.to(device), img2.to(device), img3.to(device)
-            anchor_emb = model(img1)
-            positive_emb = model(img2)
-            negative_emb = model(img3) 
+        for batch_idx, batch in enumerate(test_loader):
+            anchor_positive_negative_imgs, anchor_positive_negative_anns = batch
+            anchor_img, positive_img, negative_img = anchor_positive_negative_imgs
+            anchor_img, positive_img, negative_img = anchor_img.to(device), positive_img.to(device), negative_img.to(device)
+            anchor_emb = model(anchor_img)
+            positive_emb = model(positive_img)
+            negative_emb = model(negative_img)
             # function that takes output and turns into anchor, positive, negative
             test_loss += F.triplet_margin_loss(anchor_emb, positive_emb, negative_emb, margin=1.0, p=2) # sum up batch loss
-            for i, anc in enumerate(anchor_emb):
-                if np.linalg.norm(anc.cpu() - positive_emb.cpu()[i])<np.linalg.norm(anc.cpu() - negative_emb.cpu()[i]):
-                    correct += 1
-            test_num += len(anchor_emb)
+
+            predict_match = torch.linalg.norm(anchor_emb - positive_emb, dim=-1) < torch.linalg.norm(anchor_emb - negative_emb, dim=-1)
+
+            correct += predict_match.sum()
+            test_num += len(predict_match)
 
     test_loss /= test_num
 
@@ -75,7 +85,7 @@ def main():
     # Training settings
     # Use the command line to modify the default settings
     parser = argparse.ArgumentParser(description='TripNet: a network for ReID')
-    parser.add_argument('--name',
+    parser.add_argument('--name', default='model',
                         help="what you want to name this model save file")
     parser.add_argument('--epochs', type=int, default=14, metavar='N',
                         help='number of epochs to train (default: 14)')
@@ -97,13 +107,26 @@ def main():
                         help='For Saving the current Model')
     parser.add_argument('--batch-size', type=int, default=64,
                         help='Training batch size')
-    # It might be helpful to split data_folder into separate arguments for train/val/test
-    parser.add_argument('--data-folder', required=True,
+    # Data, model, and output directories
+    parser.add_argument('--data-folder',
+                        # For AWS, get path from folder
+                        default=os.environ.get('SM_CHANNEL_DATA'),
                         help='folder containing data images')
-    parser.add_argument('--train-json', required=True,
+    parser.add_argument('--train-json',
+                        # For AWS, get path from folder
+                        default=os.path.join(
+                            os.environ.get('SM_CHANNEL_ANNOTATIONS', '.'),
+                            'customSplit_train.json'
+                        ),
                         help='JSON with COCO-format annotations for training dataset')
-    parser.add_argument('--val-json', required=True,
+    parser.add_argument('--val-json',
+                        # For AWS, get path from folder
+                        default=os.path.join(
+                            os.environ.get('SM_CHANNEL_ANNOTATIONS', '.'),
+                            'customSplit_val.json'
+                        ),
                         help='JSON with COCO-format annotations for validation dataset')
+    parser.add_argument('--model-dir', type=str, default=os.environ.get('SM_MODEL_DIR', '.'))
     parser.add_argument('--batch-log-interval', type=int, default=10,
                         help='Number of batches to run each epoch before logging metrics.')
     parser.add_argument('--num-train-triplets', type=int, default=10*1000,
@@ -112,6 +135,8 @@ def main():
                         help='For using semantic segmentations')
     parser.add_argument('--evaluate', action='store_true', default = False,
                         help='For evaluating model performance after training')
+    parser.add_argument('--image-size', type=int, default=224,
+                        help='Input to CNN will be size (image_size, image_size, 3)')
     args = parser.parse_args()
     use_cuda = not args.no_cuda and torch.cuda.is_available()
     use_seg = args.use_seg
@@ -122,11 +147,29 @@ def main():
     device = torch.device("cuda" if use_cuda else "cpu")
     kwargs = {'num_workers': 1, 'pin_memory': True} if use_cuda else {}
 
+
+    # Define transforms
+    # torchvision pretrained models tend to use 224x224 images
+    downsample = torchvision.transforms.Compose([
+        torchvision.transforms.Resize(args.image_size),
+        # Assume that zebra is centered
+        torchvision.transforms.CenterCrop(args.image_size),
+    ])
+    # Pretrained torchvision models need specific normalization;
+    # see https://pytorch.org/vision/stable/models.html
+    normalize = torchvision.transforms.Normalize(mean=[0.485, 0.456, 0.406],
+                                                 std=[0.229, 0.224, 0.225])
+    transforms = torchvision.transforms.Compose([
+        downsample,
+        torchvision.transforms.ToTensor(),
+        normalize,
+    ])
+
     if args.evaluate:
         print('EVALUATING MODEL')
         # generate some plots, don't actually train the model
         modelName = args.name + '_model.pt'
-        model = initialize_model(use_pretrained=True, l1Units = 500, l2Units=128)
+        model = initialize_model()
         model = model.to(device)
         model.load_state_dict(torch.load(modelName))
         model.eval()
@@ -137,14 +180,6 @@ def main():
             annData = json.load(f)
         f.close()
         annData = annData['annotations'] #just the annotations
-
-        normalize = torchvision.transforms.Normalize(mean=[0.485, 0.456, 0.406],
-                                         std=[0.229, 0.224, 0.225])
-        transforms = torchvision.transforms.Compose([
-            torchvision.transforms.Resize([512, 768]),  # Some images are slightly different sizes
-            torchvision.transforms.ToTensor(),
-            normalize,
-        ])
 
         val_loader = data_loader.get_loader(
             args.data_folder,
@@ -288,16 +323,6 @@ def main():
 
         return
 
-    # TODO: update these (placeholder) transforms
-    # Also, we may need different transforms for train/val
-    normalize = torchvision.transforms.Normalize(mean=[0.485, 0.456, 0.406],
-                                     std=[0.229, 0.224, 0.225])
-    transforms = torchvision.transforms.Compose([
-        torchvision.transforms.Resize([512, 768]), # Some images are slightly different sizes
-        torchvision.transforms.ToTensor(),
-        normalize,
-    ])
-
     # Initialize dataset loaders
     train_loader = data_loader.get_loader(
         args.data_folder,
@@ -320,7 +345,7 @@ def main():
 
     # object recognition, pretrained on imagenet
     # https://pytorch.org/hub/pytorch_vision_densenet/
-    model = initialize_model(use_pretrained=True, l1Units = 500, l2Units=128)
+    model = initialize_model()
     # print(model)
     model = model.to(device)
     # Try different optimzers here [Adam, SGD, RMSprop]
@@ -341,7 +366,7 @@ def main():
         scheduler.step()  # learning rate scheduler
 
         if args.save_model:
-                torch.save(model.state_dict(), args.name + "_model.pt")
+            torch.save(model.state_dict(), os.path.join(args.model_dir, args.name + "_model.pt"))
 
     # plot training and validation loss by epoch
     f = plt.figure(figsize=(6, 5))
