@@ -3,6 +3,7 @@ https://github.com/yunjey/pytorch-tutorial/blob/master/tutorials/03-advanced/ima
 """
 
 import torch
+import torchvision
 import os.path
 import pathlib
 from PIL import Image
@@ -14,7 +15,7 @@ from tqdm import tqdm
 
 class TripletZebras(torch.utils.data.Dataset):
     """COCO Custom Dataset compatible with torch.utils.data.DataLoader."""
-    def __init__(self, root, json, transform=None, num_triplets=100*1000, apply_mask=False):
+    def __init__(self, root, json, transform=None, num_triplets=100*1000, apply_mask=False, apply_mask_bbox=False):
         """Set the path for images and annotations.
 
         Args:
@@ -28,6 +29,7 @@ class TripletZebras(torch.utils.data.Dataset):
         self.annotations = coco.anns
         self.images = coco.imgs
         self.mask = apply_mask
+        self.mask_bbox = apply_mask_bbox
         
         zebra_annotations = [ann for ann in self.annotations.values() if ann['category_id'] == 1]
         zebra_names = [ann['name'] for ann in zebra_annotations]
@@ -67,12 +69,17 @@ class TripletZebras(torch.utils.data.Dataset):
             # Apply segmentation mask
             if self.mask==True:
                 mask = mask_util.decode(annotation['maskrcnn_mask_rle'])
-                segImage = image.copy()
-                segImage  = np.array(segImage)
+                segImage  = np.array(image)
                 binaryMask = (mask > 0.5).astype(np.float32)
                 segImage[np.where(binaryMask == 0.0)] = 0
                 image = Image.fromarray(np.uint8(segImage)).convert('RGB')
+                # Crop to bounding box
+                image = self.crop_to_bbox(image, annotation['maskrcnn_bbox'])
             
+            if self.mask_bbox:
+                # Crop to bounding box
+                image = self.crop_to_bbox(image, annotation['bbox_tlbr'])
+
             # Transform to tensor
             if self.transform:
                 image = self.transform(image)
@@ -101,12 +108,31 @@ class TripletZebras(torch.utils.data.Dataset):
 
         return (anchor_annotation_id, positive_annotation_id, negative_annotation_id)
 
-def get_loader(root, json, transform, batch_size, shuffle=True, num_workers=4, num_triplets=100*1000, apply_mask=False):
+    def crop_to_bbox(self, image: Image.Image, bbox: tuple):
+        # Assume order of bbox from maskrcnn
+        x_left, y_top, x_right, y_bottom = bbox
+        width = x_right - x_left
+        height = y_bottom - y_top
+        x_center = (x_left + x_right) / 2
+        y_center = (y_top + y_bottom) / 2
+
+        # Crop to a square box, so this doesn't get cut off later
+        new_size = max(width, height)
+        x_left = round(x_center - (new_size / 2))
+        y_top = round(y_center - (new_size / 2))
+
+        cropped_image = torchvision.transforms.functional.crop(image, y_top, x_left, new_size, new_size)
+
+        return cropped_image
+
+
+def get_loader(root, json, transform, batch_size, shuffle=True, num_workers=4, num_triplets=100*1000, apply_mask=False, apply_mask_bbox=False):
     zebra_triplets = TripletZebras(root=root,
         json=json,
         transform=transform,
         num_triplets=num_triplets,
-        apply_mask=apply_mask
+        apply_mask=apply_mask,
+        apply_mask_bbox=apply_mask_bbox
     )
 
     # Data loader for COCO dataset
@@ -115,7 +141,7 @@ def get_loader(root, json, transform, batch_size, shuffle=True, num_workers=4, n
     data_loader = torch.utils.data.DataLoader(dataset=zebra_triplets,
                 batch_size=32,
                 shuffle=True,
-                num_workers=4)
+                num_workers=num_workers)
     
     return data_loader
 
@@ -143,9 +169,15 @@ def main():
     parser.add_argument('-o', '--output-csv', type=str,
             default=None,
             help='output path to dump positive/negative')
-    parser.add_argument('-m', '--apply_mask', type=bool,
+    parser.add_argument('--num-workers', type=int,
+            default=4,
+            help='num dataloader workers. https://pytorch.org/docs/stable/data.html')
+    parser.add_argument('-m', '--apply_mask', action='store_true',
         default=False,
         help='apply segmentation mask to the image')
+    parser.add_argument('-b', '--apply_mask_bbox', action='store_true',
+        default=False,
+        help='mask out bounding box from the image')
     args = parser.parse_args()
     np.random.seed(args.random_seed)
 
@@ -159,8 +191,10 @@ def main():
         transforms,
         batch_size=4,
         shuffle=False,
+        num_workers=args.num_workers,
         num_triplets=args.num_triplets,
-        apply_mask=args.apply_mask
+        apply_mask=args.apply_mask,
+        apply_mask_bbox=args.apply_mask_bbox
     )
 
     # Print single element from the data loader
