@@ -15,7 +15,7 @@ from tqdm import tqdm
 
 class TripletZebras(torch.utils.data.Dataset):
     """COCO Custom Dataset compatible with torch.utils.data.DataLoader."""
-    def __init__(self, root, json, transform=None, num_triplets=100*1000, apply_mask=False):
+    def __init__(self, root, json, transform=None, num_triplets=100*1000, apply_mask=False, apply_mask_bbox=False):
         """Set the path for images and annotations.
 
         Args:
@@ -29,6 +29,7 @@ class TripletZebras(torch.utils.data.Dataset):
         self.annotations = coco.anns
         self.images = coco.imgs
         self.mask = apply_mask
+        self.mask_bbox = apply_mask_bbox
         
         zebra_annotations = [ann for ann in self.annotations.values() if ann['category_id'] == 1]
         zebra_names = [ann['name'] for ann in zebra_annotations]
@@ -75,6 +76,9 @@ class TripletZebras(torch.utils.data.Dataset):
                 # Crop to bounding box
                 image = self.crop_to_bbox(image, annotation['maskrcnn_bbox'])
             
+            if self.mask_bbox:
+                # Crop to bounding box
+                image = self.crop_to_bbox(image, annotation['bbox_tlbr'])
             # Transform to tensor
             if self.transform:
                 image = self.transform(image)
@@ -121,12 +125,13 @@ class TripletZebras(torch.utils.data.Dataset):
         return cropped_image
 
 
-def get_loader(root, json, transform, batch_size, shuffle=True, num_workers=4, num_triplets=100*1000, apply_mask=False):
+def get_loader(root, json, transform, batch_size, shuffle=True, num_workers=4, num_triplets=100*1000, apply_mask=False, apply_mask_bbox=False):
     zebra_triplets = TripletZebras(root=root,
         json=json,
         transform=transform,
         num_triplets=num_triplets,
-        apply_mask=apply_mask
+        apply_mask=apply_mask,
+        apply_mask_bbox=apply_mask_bbox
     )
 
     # Data loader for COCO dataset
@@ -169,6 +174,9 @@ def main():
     parser.add_argument('-m', '--apply_mask', action='store_true',
         default=False,
         help='apply segmentation mask to the image')
+    parser.add_argument('-b', '--apply_mask_bbox', action='store_true',
+        default=False,
+        help='mask out bounding box from the image')
     args = parser.parse_args()
     np.random.seed(args.random_seed)
 
