@@ -3,6 +3,7 @@ https://github.com/yunjey/pytorch-tutorial/blob/master/tutorials/03-advanced/ima
 """
 
 import torch
+import torchvision
 import os.path
 import pathlib
 from PIL import Image
@@ -67,11 +68,12 @@ class TripletZebras(torch.utils.data.Dataset):
             # Apply segmentation mask
             if self.mask==True:
                 mask = mask_util.decode(annotation['maskrcnn_mask_rle'])
-                segImage = image.copy()
-                segImage  = np.array(segImage)
+                segImage  = np.array(image)
                 binaryMask = (mask > 0.5).astype(np.float32)
                 segImage[np.where(binaryMask == 0.0)] = 0
                 image = Image.fromarray(np.uint8(segImage)).convert('RGB')
+                # Crop to bounding box
+                image = self.crop_to_bbox(image, annotation['maskrcnn_bbox'])
             
             # Transform to tensor
             if self.transform:
@@ -101,6 +103,24 @@ class TripletZebras(torch.utils.data.Dataset):
 
         return (anchor_annotation_id, positive_annotation_id, negative_annotation_id)
 
+    def crop_to_bbox(self, image: Image.Image, bbox: tuple):
+        # Assume order of bbox from maskrcnn
+        x_left, y_top, x_right, y_bottom = bbox
+        width = x_right - x_left
+        height = y_bottom - y_top
+        x_center = (x_left + x_right) / 2
+        y_center = (y_top + y_bottom) / 2
+
+        # Crop to a square box, so this doesn't get cut off later
+        new_size = max(width, height)
+        x_left = round(x_center - (new_size / 2))
+        y_top = round(y_center - (new_size / 2))
+
+        cropped_image = torchvision.transforms.functional.crop(image, y_top, x_left, new_size, new_size)
+
+        return cropped_image
+
+
 def get_loader(root, json, transform, batch_size, shuffle=True, num_workers=4, num_triplets=100*1000, apply_mask=False):
     zebra_triplets = TripletZebras(root=root,
         json=json,
@@ -115,7 +135,7 @@ def get_loader(root, json, transform, batch_size, shuffle=True, num_workers=4, n
     data_loader = torch.utils.data.DataLoader(dataset=zebra_triplets,
                 batch_size=32,
                 shuffle=True,
-                num_workers=4)
+                num_workers=num_workers)
     
     return data_loader
 
@@ -143,7 +163,10 @@ def main():
     parser.add_argument('-o', '--output-csv', type=str,
             default=None,
             help='output path to dump positive/negative')
-    parser.add_argument('-m', '--apply_mask', type=bool,
+    parser.add_argument('--num-workers', type=int,
+            default=4,
+            help='num dataloader workers. https://pytorch.org/docs/stable/data.html')
+    parser.add_argument('-m', '--apply_mask', action='store_true',
         default=False,
         help='apply segmentation mask to the image')
     args = parser.parse_args()
