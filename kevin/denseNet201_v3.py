@@ -20,15 +20,19 @@ logging.basicConfig(
         datefmt='%H:%M:%S')
 
 
-def initialize_model(use_pretrained=True, l1Units = 500, l2Units=128):
+def initialize_model(use_pretrained=True, l1Units = 512, l2Units=128):
 
-    model = torch.hub.load('pytorch/vision:v0.9.0', 'densenet121', pretrained=use_pretrained)
+    model = torch.hub.load('pytorch/vision:v0.9.0', 'densenet201', pretrained=use_pretrained)
     for param in model.parameters():
         param.requires_grad = False  # because these layers are pretrained
     # change the final layer to be a bottle neck of two layers
     extracted_features_size = model.classifier.in_features
-    model.classifier = nn.Sequential(nn.Linear(extracted_features_size, l1Units), nn.Linear(l1Units,
-                                                                     l2Units))  # assuming that the fc7 layer has 512 neurons, otherwise change it
+    model.classifier = nn.Sequential(
+            nn.Linear(extracted_features_size, l1Units),
+            nn.BatchNorm1d(l1Units),
+            nn.ReLU(),
+            nn.Linear(l1Units, l2Units)
+            )
     return model
 
 def train(args, model, device, train_loader, optimizer, epoch):
@@ -293,7 +297,7 @@ def main():
 
     # object recognition, pretrained on imagenet
     # https://pytorch.org/hub/pytorch_vision_densenet/
-    model = initialize_model(use_pretrained=True, l1Units = 500, l2Units=128)
+    model = initialize_model(use_pretrained=True)
     # print(model)
     model = model.to(device)
     # Try different optimzers here [Adam, SGD, RMSprop]
