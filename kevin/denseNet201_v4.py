@@ -8,10 +8,9 @@ import torch.optim as optim
 import data_loader_triplet_v2 as data_loader
 from torch.optim.lr_scheduler import StepLR
 import matplotlib.pyplot as plt
+from matplotlib import cm
 import json
 from sklearn.manifold import TSNE
-from PIL import Image
-import pycocotools.mask as mask_util
 
 
 def initialize_model(use_pretrained=True, l1Units = 500, l2Units=128):
@@ -139,9 +138,12 @@ def main():
         f.close()
         annData = annData['annotations'] #just the annotations
 
+        normalize = torchvision.transforms.Normalize(mean=[0.485, 0.456, 0.406],
+                                         std=[0.229, 0.224, 0.225])
         transforms = torchvision.transforms.Compose([
-            torchvision.transforms.Resize([500, 750]),  # Some images are slightly different sizes
+            torchvision.transforms.Resize([512, 768]),  # Some images are slightly different sizes
             torchvision.transforms.ToTensor(),
+            normalize,
         ])
 
         val_loader = data_loader.get_loader(
@@ -160,15 +162,16 @@ def main():
         wrong_negDis = []
         totError = 0.0
         totCount = 0
-        allFeat = np.zeros((len(val_loader.dataset), 128))
-        allLabel = np.zeros((len(val_loader.dataset)))
+        loggedAnns = []
+        zebIDs = []
+        allEmbeds = []
+        allIms = []
         with torch.no_grad():  # For the inference step, gradient is not computed
             for (img1, img2, img3), (ann1, ann2, ann3) in val_loader:
                 img1Dev, img2Dev, img3Dev = img1.to(device), img2.to(device), img3.to(device)
                 anchor_emb = model(img1Dev) # just use these
                 positive_emb = model(img2Dev)
                 negative_emb = model(img3Dev)
-                lastcount = totCount
                 # find the errors
                 for i, anc in enumerate(anchor_emb):
                     if np.linalg.norm(anc.cpu() - positive_emb.cpu()[i]) >= np.linalg.norm(anc.cpu() - negative_emb.cpu()[i]):
@@ -177,48 +180,74 @@ def main():
                         wrong_negDis.append(np.linalg.norm(anc.cpu() - negative_emb.cpu()[i]))
                         totError +=1.0
                     totCount += 1
+                for i, anc in enumerate(anchor_emb):
+                    annID = float(ann1[i].numpy())
+                    if annID not in loggedAnns:
+                        zebIDs.append(val_loader.dataset.annotations[annID]['name'])
+                        allEmbeds.append(anc.cpu().numpy().copy())
+                        allIms.append(img1[i].permute(1,2,0).numpy().copy())
+                        loggedAnns.append(annID)
 
-            # loop through all annotation anchors in the validation set and get the embeddings for each one
-            # also make a list of names corresponding to each anchor
-            zebIDs = []
-            allIms = []
-            allEmbeds = []
-            for annID in val_loader.dataset.annotations.keys(): # for every zebraID in the dataset
-                # get the image associated
-                print(val_loader.dataset.annotations[annID]['image_id'])
-                this_im = val_loader.dataset.images[val_loader.dataset.annotations[annID]['image_id']]
-                print(this_im) # this is a dictionary entry of details about the image, not the image itself
-
-                # TO DO want the images with the transformations
-                # image_path = os.path.join('../../Data/gzgc.coco/images/train2020', this_im['file_name'])
-                # # Load image
-                # image = Image.open(image_path).convert('RGB')
-                #
-                # # Apply segmentation mask
-                # if use_seg:
-                #     mask = mask_util.decode(val_loader.dataset.annotations[annID]['maskrcnn_mask_rle'])
-                #     segImage = image.copy()
-                #     segImage = np.array(segImage)
-                #     binaryMask = (mask > 0.5).astype(np.float32)
-                #     segImage[np.where(binaryMask == 0.0)] = 0
-                #     image = Image.fromarray(np.uint8(segImage)).convert('RGB')
-
-                allIms.append(image.copy())
-                #get the zebra name associated
-                zebIDs.append(val_loader.dataset.annotations[annID]['name'])
-                # run the embeddings for each image
-                allEmbeds.append(model(image.to(device)))
-
-        print(len(wrong_trip))
-        print(len(wrong_trip[0]))
         print('************')
         print('total error: ' + str(totError) + '/' + str(totCount) + ' = ' + str(totError/totCount) + '%')
 
         # TO DO now visualize with tSNE all the zebra embeddings - each a different color
-        feat_embedded = TSNE(n_components=2, n_iter=300).fit_transform(allEmbeds)
-        print(feat_embedded.shape)
-        # plot, color coded so one zebra name has one color
+        feat_embedded = TSNE(n_components=2, n_iter=300).fit_transform(np.array(allEmbeds))
+        zebNames = np.unique(zebIDs)
 
+        print(feat_embedded.shape)
+
+        # plot, color coded so one zebra name has one color
+        # plot scatter
+        f = plt.figure(figsize=(6,5))
+        ax = plt.subplot()
+        # cmap = cm.get_cmap('gist_rainbow', len(zebNames))
+        # cmap = cmap(range(len(zebNames)))
+        cmap = cm.get_cmap('gist_rainbow', 20)
+        cmap = cmap(range(20))
+        cI = 0
+        for iter, name in enumerate(zebNames):
+            if cI <20: # don't want to plot everything
+                # pull all the points with that target
+                iter_feat = np.squeeze(feat_embedded[[i for i, e in enumerate(zebIDs) if e == name], :])
+                if type(zebIDs.index(name)) == int:
+                    ax.scatter(iter_feat[0], iter_feat[1], c=np.array([cmap[iter,:]]), s=35, label=name,
+                               alpha=0.8, edgecolors='none')
+                elif len(zebIDs.index(name)) > 1:
+                    ax.scatter(iter_feat[:,0], iter_feat[:,1], c=np.array([cmap[iter,:]]), s=35, label=name,
+                               alpha=0.8, edgecolors='none')
+                cI += 1
+        ax.set_title('tSNE scatter of embedding')
+        #plt.legend()
+        plt.show()
+
+        # visualize 5 annotations with each the four annotations closest
+        sampleImInds = np.random.choice(len(loggedAnns), size=5)
+        f = plt.figure(figsize=(6, 5))
+        for i in range(5):
+            dist = np.zeros((len(allEmbeds)))
+            # get the four closest embeddings
+            anc = allEmbeds[i]
+            for j, emb in enumerate(allEmbeds):
+                if j != i:
+                    dist[j] = (np.linalg.norm(anc - emb))
+            dist[i] = np.max(dist)*2.0 # just insuring we don't pick the same image again
+            bestInds = np.argsort(dist)[:4] # sort smallest to largest
+
+            ax = plt.subplot(5, 5, i*5 + 1)
+            plt.imshow(allIms[sampleImInds[i]])
+            ax.set_title('anchor ' + zebIDs[i])
+            plt.xticks([])
+            plt.yticks([])
+
+            for j in range(4):
+                ax = plt.subplot(5, 5, i*5 + 2 +j)
+                plt.imshow(allIms[bestInds[j]])
+                ax.set_title('rank ' + str(j + 1) + ': ' + zebIDs[i])
+                plt.xticks([])
+                plt.yticks([])
+        plt.tight_layout()
+        plt.show()
 
         # visualize 6 errors
         f = plt.figure(figsize=(6, 5))
@@ -227,9 +256,7 @@ def main():
             #sample = sample.byte()
             # plot
             anc = triplet[0].permute(1,2,0)
-            print(anc)
-            print(type(anc))
-            print(anc.shape)
+
             #anc = transforms.functional.to_pil_image(anc.byte())
             anc = np.asarray(anc)
             pos = triplet[1].permute(1,2,0)
@@ -239,19 +266,19 @@ def main():
             #neg = transforms.functional.to_pil_image(neg.byte())
             neg = np.asarray(neg)
             ax = plt.subplot(6, 3, i*3 + 1)
-            plt.imshow(anc)
+            plt.imshow(anc/np.max(np.max(np.abs(anc))))
             ax.set_title('anchor')
             plt.xticks([])
             plt.yticks([])
 
             ax = plt.subplot(6, 3, i*3 + 2)
-            plt.imshow(pos)
+            plt.imshow(pos/np.max(np.max(np.abs(pos))))
             ax.set_title('pos dist=' + str(wrong_posDis[i]))
             plt.xticks([])
             plt.yticks([])
 
             ax = plt.subplot(6, 3, i*3 + 3)
-            plt.imshow(neg)
+            plt.imshow(neg/np.max(np.max(np.abs(neg))))
             ax.set_title('neg dist=' + str(wrong_negDis[i]))
             plt.xticks([])
             plt.yticks([])
@@ -263,9 +290,12 @@ def main():
 
     # TODO: update these (placeholder) transforms
     # Also, we may need different transforms for train/val
+    normalize = torchvision.transforms.Normalize(mean=[0.485, 0.456, 0.406],
+                                     std=[0.229, 0.224, 0.225])
     transforms = torchvision.transforms.Compose([
-        torchvision.transforms.Resize([500, 750]), # Some images are slightly different sizes
+        torchvision.transforms.Resize([512, 768]), # Some images are slightly different sizes
         torchvision.transforms.ToTensor(),
+        normalize,
     ])
 
     # Initialize dataset loaders
