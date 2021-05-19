@@ -122,6 +122,8 @@ def main():
                         help='For using semantic segmentations')
     parser.add_argument('--evaluate', action='store_true', default = False,
                         help='For evaluating model performance after training')
+    parser.add_argument('--image-size', type=int, default=224,
+                        help='Input to CNN will be size (image_size, image_size, 3)')
 
     # Data, model, and output directories
     parser.add_argument('--data-folder',
@@ -154,12 +156,18 @@ def main():
 
 
     # Define transforms
+    # torchvision pretrained models tend to use 224x224 images
+    downsample = torchvision.transforms.Compose([
+        torchvision.transforms.Resize(args.image_size),
+        # Assume that zebra is centered
+        torchvision.transforms.CenterCrop(args.image_size),
+    ])
     # Pretrained torchvision models need specific normalization;
     # see https://pytorch.org/vision/stable/models.html
     normalize = torchvision.transforms.Normalize(mean=[0.485, 0.456, 0.406],
                                                  std=[0.229, 0.224, 0.225])
     transforms = torchvision.transforms.Compose([
-        torchvision.transforms.Resize([512, 768]), # Some images are slightly different sizes
+        downsample,
         torchvision.transforms.ToTensor(),
         normalize,
     ])
