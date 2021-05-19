@@ -42,18 +42,20 @@ def train(args, model, device, train_loader, optimizer, epoch):
     trained for 1 epoch.
     '''
     model.train()  # Set the model to training mode
-    for batch_idx, (img1, img2, img3), (ann1, ann2, ann3) in enumerate(train_loader):
-        img1, img2, img3 = img1.to(device), img2.to(device), img3.to(device)
+    for batch_idx, batch in enumerate(train_loader):
+        anchor_positive_negative_imgs, anchor_positive_negative_anns = batch
+        anchor_img, positive_img, negative_img = anchor_positive_negative_imgs
+        anchor_img, positive_img, negative_img = anchor_img.to(device), positive_img.to(device), negative_img.to(device)
         optimizer.zero_grad()  # Clear the gradient
-        anchor_emb = model(img1)
-        positive_emb = model(img2)
-        negative_emb = model(img3) 
+        anchor_emb = model(anchor_img)
+        positive_emb = model(positive_img)
+        negative_emb = model(negative_img)
         loss = F.triplet_margin_loss(anchor_emb, positive_emb, negative_emb, margin=1.0, p=2)  # sum up batch loss
         loss.backward()  # Gradient computation
         optimizer.step()  # Perform a single optimization step
         if batch_idx % args.batch_log_interval == 0:
             logging.info('Train Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}'.format(
-                epoch, batch_idx * len(img1), len(train_loader.sampler),
+                epoch, batch_idx * len(anchor_img), len(train_loader.sampler),
                        100. * batch_idx / len(train_loader), loss.item()))
 
 def test(model, device, test_loader, dataName):
@@ -62,13 +64,20 @@ def test(model, device, test_loader, dataName):
     correct = 0 # number of times it gets the distances correct
     test_num = 0
     with torch.no_grad():  # For the inference step, gradient is not computed
-        for (img1, img2, img3), (ann1, ann2, ann3) in test_loader:
-            img1, img2, img3 = img1.to(device), img2.to(device), img3.to(device)
-            anchor_emb = model(img1)
-            positive_emb = model(img2)
-            negative_emb = model(img3) 
+        for batch_idx, batch in enumerate(test_loader):
+            anchor_positive_negative_imgs, anchor_positive_negative_anns = batch
+            anchor_img, positive_img, negative_img = anchor_positive_negative_imgs
+            anchor_img, positive_img, negative_img = anchor_img.to(device), positive_img.to(device), negative_img.to(device)
+            anchor_emb = model(anchor_img)
+            positive_emb = model(positive_img)
+            negative_emb = model(negative_img)
             # function that takes output and turns into anchor, positive, negative
             test_loss += F.triplet_margin_loss(anchor_emb, positive_emb, negative_emb, margin=1.0, p=2) # sum up batch loss
+
+            predict_match = torch.linalg.norm(anchor_emb - positive_emb, dim=-1) < torch.linalg.norm(anchor_emb - negative_emb, dim=-1)
+
+            correct += predict_match.sum()
+            test_num += len(predict_match)
 
     test_loss /= test_num
 
