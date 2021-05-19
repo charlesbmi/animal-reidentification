@@ -8,6 +8,7 @@ import torch.optim as optim
 import data_loader_triplet_v2 as data_loader
 from torch.optim.lr_scheduler import StepLR
 import matplotlib.pyplot as plt
+import os
 import json
 from sklearn.manifold import TSNE
 from PIL import Image
@@ -104,12 +105,6 @@ def main():
     parser.add_argument('--batch-size', type=int, default=64,
                         help='Training batch size')
     # It might be helpful to split data_folder into separate arguments for train/val/test
-    parser.add_argument('--data-folder', required=True,
-                        help='folder containing data images')
-    parser.add_argument('--train-json', required=True,
-                        help='JSON with COCO-format annotations for training dataset')
-    parser.add_argument('--val-json', required=True,
-                        help='JSON with COCO-format annotations for validation dataset')
     parser.add_argument('--batch-log-interval', type=int, default=10,
                         help='Number of batches to run each epoch before logging metrics.')
     parser.add_argument('--num-train-triplets', type=int, default=10*1000,
@@ -118,6 +113,27 @@ def main():
                         help='For using semantic segmentations')
     parser.add_argument('--evaluate', action='store_true', default = False,
                         help='For evaluating model performance after training')
+
+    # Data, model, and output directories
+    parser.add_argument('--data-folder',
+                        # For AWS, get path from folder
+                        default=os.environ.get('SM_CHANNEL_DATA'),
+                        help='folder containing data images')
+    parser.add_argument('--train-json',
+                        # For AWS, get path from folder
+                        default=os.path.join(
+                            os.environ.get('SM_CHANNEL_ANNOTATIONS', '.'),
+                            'customSplit_train.json'
+                        ),
+                        help='JSON with COCO-format annotations for training dataset')
+    parser.add_argument('--val-json',
+                        # For AWS, get path from folder
+                        default=os.path.join(
+                            os.environ.get('SM_CHANNEL_ANNOTATIONS', '.'),
+                            'customSplit_val.json'
+                        ),
+                        help='JSON with COCO-format annotations for validation dataset')
+    parser.add_argument('--model-dir', type=str, default=os.environ.get('SM_MODEL_DIR', '.'))
     args = parser.parse_args()
     use_cuda = not args.no_cuda and torch.cuda.is_available()
     use_seg = args.use_seg
@@ -140,10 +156,10 @@ def main():
     ])
 
     if args.evaluate:
-        print('EVALUATING MODEL')
+        logging.info('EVALUATING MODEL')
         # generate some plots, don't actually train the model
         modelName = args.name + '_model.pt'
-        model = initialize_model(use_pretrained=True, l1Units = 500, l2Units=128)
+        model = initialize_model(use_pretrained=True)
         model = model.to(device)
         model.load_state_dict(torch.load(modelName))
         model.eval()
@@ -315,7 +331,7 @@ def main():
         scheduler.step()  # learning rate scheduler
 
         if args.save_model:
-                torch.save(model.state_dict(), args.name + "_model.pt")
+            torch.save(model.state_dict(), os.path.join(args.model_dir, args.name + "_model.pt"))
 
     # plot training and validation loss by epoch
     f = plt.figure(figsize=(6, 5))
