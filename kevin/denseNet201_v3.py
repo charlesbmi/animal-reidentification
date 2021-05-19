@@ -127,6 +127,18 @@ def main():
     device = torch.device("cuda" if use_cuda else "cpu")
     kwargs = {'num_workers': 1, 'pin_memory': True} if use_cuda else {}
 
+
+    # Define transforms
+    # Pretrained torchvision models need specific normalization;
+    # see https://pytorch.org/vision/stable/models.html
+    normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
+                                     std=[0.229, 0.224, 0.225])
+    transforms = torchvision.transforms.Compose([
+        torchvision.transforms.Resize([512, 768]), # Some images are slightly different sizes
+        torchvision.transforms.ToTensor(),
+        normalize,
+    ])
+
     if args.evaluate:
         print('EVALUATING MODEL')
         # generate some plots, don't actually train the model
@@ -142,11 +154,6 @@ def main():
             annData = json.load(f)
         f.close()
         annData = annData['annotations'] #just the annotations
-
-        transforms = torchvision.transforms.Compose([
-            torchvision.transforms.Resize([500, 750]),  # Some images are slightly different sizes
-            torchvision.transforms.ToTensor(),
-        ])
 
         val_loader = data_loader.get_loader(
             args.data_folder,
@@ -264,16 +271,6 @@ def main():
 
 
         return
-
-    # Pretrained torchvision models need specific normalization;
-    # see https://pytorch.org/vision/stable/models.html
-    normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
-                                     std=[0.229, 0.224, 0.225])
-    transforms = torchvision.transforms.Compose([
-        torchvision.transforms.Resize([512, 768]), # Some images are slightly different sizes
-        torchvision.transforms.ToTensor(),
-        normalize,
-    ])
 
     # Initialize dataset loaders
     train_loader = data_loader.get_loader(
