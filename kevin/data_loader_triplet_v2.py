@@ -30,6 +30,8 @@ class TripletZebras(torch.utils.data.Dataset):
         self.images = coco.imgs
         self.mask = apply_mask
         self.mask_bbox = apply_mask_bbox
+
+        assert not (apply_mask and apply_mask_bbox), 'Can only choose one mask-type'
         
         zebra_annotations = [ann for ann in self.annotations.values() if ann['category_id'] == 1]
         zebra_names = [ann['name'] for ann in zebra_annotations]

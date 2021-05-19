@@ -133,6 +133,8 @@ def main():
                         help='Number of triplets to generate for each training epoch.')
     parser.add_argument('--use-seg',action='store_true', default=False,
                         help='For using semantic segmentations')
+    parser.add_argument('--use-bbox',action='store_true', default=False,
+                        help='For cropping to bounding box')
     parser.add_argument('--evaluate', action='store_true', default = False,
                         help='For evaluating model performance after training')
     parser.add_argument('--image-size', type=int, default=224,
@@ -142,11 +144,11 @@ def main():
     args = parser.parse_args()
     use_cuda = not args.no_cuda and torch.cuda.is_available()
     use_seg = args.use_seg
+    use_bbox = args.use_bbox
     use_aug = args.apply_augmentation
-    print('use seg')
-    print(use_seg)
-    print('use aug')
-    print(use_aug)
+    print('use seg?', use_seg)
+    print('use bbox?', use_bbox)
+    print('use aug?', use_aug)
     np.random.seed(2021)  # to ensure you always get the same train/test split
     torch.manual_seed(args.seed)
     device = torch.device("cuda" if use_cuda else "cpu")
@@ -213,6 +215,7 @@ def main():
             shuffle=True,
             num_triplets=int(0.15 * args.num_train_triplets),
             apply_mask=use_seg,
+            apply_mask_bbox=use_bbox,
         )
 
         # plot 6 errors on the validation set and count total number of errors
@@ -357,6 +360,7 @@ def main():
             shuffle=True,
             num_triplets=args.num_train_triplets,
             apply_mask=use_seg,
+            apply_mask_bbox=use_bbox,
         )
     else:
         train_loader = data_loader.get_loader(
@@ -367,6 +371,7 @@ def main():
             shuffle=True,
             num_triplets=args.num_train_triplets,
             apply_mask=use_seg,
+            apply_mask_bbox=use_bbox,
         )
     val_loader = data_loader.get_loader(
         args.data_folder,
@@ -376,6 +381,7 @@ def main():
         shuffle=True,
         num_triplets=int(0.15 * args.num_train_triplets),
         apply_mask=use_seg,
+        apply_mask_bbox=use_bbox,
     )
 
     # object recognition, pretrained on imagenet
