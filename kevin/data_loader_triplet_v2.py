@@ -190,8 +190,10 @@ def main():
         transforms,
         batch_size=4,
         shuffle=False,
+        num_workers=args.num_workers,
         num_triplets=args.num_triplets,
-        apply_mask=args.apply_mask
+        apply_mask=args.apply_mask,
+        apply_mask_bbox=args.apply_mask_bbox
     )
 
     # Print single element from the data loader
