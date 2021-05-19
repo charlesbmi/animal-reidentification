@@ -147,8 +147,8 @@ def main():
     # Define transforms
     # Pretrained torchvision models need specific normalization;
     # see https://pytorch.org/vision/stable/models.html
-    normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
-                                     std=[0.229, 0.224, 0.225])
+    normalize = torchvision.transforms.Normalize(mean=[0.485, 0.456, 0.406],
+                                                 std=[0.229, 0.224, 0.225])
     transforms = torchvision.transforms.Compose([
         torchvision.transforms.Resize([512, 768]), # Some images are slightly different sizes
         torchvision.transforms.ToTensor(),
