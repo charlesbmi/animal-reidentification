@@ -140,7 +140,7 @@ def main():
                         help='For evaluating model performance after training')
     parser.add_argument('--image-size', type=int, default=224,
                         help='Input to CNN will be size (image_size, image_size, 3)')
-    parser.add_argument('--apply-augmentation',  action='store_true', default = False,
+    parser.add_argument('--apply-augmentation',  type=bool, default = False,
                     help='Applies image augmentations')
     args = parser.parse_args()
     use_cuda = not args.no_cuda and torch.cuda.is_available()
