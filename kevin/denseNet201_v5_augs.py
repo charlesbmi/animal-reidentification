@@ -403,8 +403,9 @@ def main():
         train(args, model, device, train_loader, optimizer, epoch) # None placeholder for triplet loss argument
         trloss = test(model, device, train_loader, "train data") # training loss
         vloss = test(model, device, val_loader, "val data") # validation loss
-        trainLoss.append(trloss)
-        valLoss.append(vloss)
+        # Move losses to cpu for plotting
+        trainLoss.append(trloss.cpu())
+        valLoss.append(vloss.cpu())
         scheduler.step()  # learning rate scheduler
 
         if args.save_model:
