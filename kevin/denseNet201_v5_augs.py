@@ -127,6 +127,7 @@ def main():
                         ),
                         help='JSON with COCO-format annotations for validation dataset')
     parser.add_argument('--model-dir', type=str, default=os.environ.get('SM_MODEL_DIR', '.'))
+    parser.add_argument('--output-data-dir', type=str, default=os.environ.get('SM_OUTPUT_DATA_DIR', '.'))
     parser.add_argument('--batch-log-interval', type=int, default=10,
                         help='Number of batches to run each epoch before logging metrics.')
     parser.add_argument('--num-train-triplets', type=int, default=10*1000,
