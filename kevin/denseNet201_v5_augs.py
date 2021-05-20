@@ -103,7 +103,7 @@ def main():
                         help='disables CUDA training')
     parser.add_argument('--load-model', type=str,
                         help='model file path or model name for plotting fract comparison')
-    parser.add_argument('--save-model', action='store_true', default=True,
+    parser.add_argument('--save-model', type=bool, default=True,
                         help='For Saving the current Model')
     parser.add_argument('--batch-size', type=int, default=64,
                         help='Training batch size')
@@ -131,9 +131,9 @@ def main():
                         help='Number of batches to run each epoch before logging metrics.')
     parser.add_argument('--num-train-triplets', type=int, default=10*1000,
                         help='Number of triplets to generate for each training epoch.')
-    parser.add_argument('--use-seg',action='store_true', default=False,
+    parser.add_argument('--use-seg', type=bool, default=False,
                         help='For using semantic segmentations')
-    parser.add_argument('--use-bbox',action='store_true', default=False,
+    parser.add_argument('--use-bbox', type=bool, default=False,
                         help='For cropping to bounding box')
     parser.add_argument('--evaluate', action='store_true', default = False,
                         help='For evaluating model performance after training')
