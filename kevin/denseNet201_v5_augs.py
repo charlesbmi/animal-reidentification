@@ -422,6 +422,7 @@ def main():
     plt.xlabel('epoch')
     plt.ylabel('loss')
     plt.legend()
+    f.savefig(os.path.join(args.output_data_dir, 'learning_curve.pdf'))
     plt.show()
 
 
