@@ -127,6 +127,7 @@ def main():
                         ),
                         help='JSON with COCO-format annotations for validation dataset')
     parser.add_argument('--model-dir', type=str, default=os.environ.get('SM_MODEL_DIR', '.'))
+    parser.add_argument('--output-data-dir', type=str, default=os.environ.get('SM_OUTPUT_DATA_DIR', '.'))
     parser.add_argument('--batch-log-interval', type=int, default=10,
                         help='Number of batches to run each epoch before logging metrics.')
     parser.add_argument('--num-train-triplets', type=int, default=10*1000,
@@ -402,8 +403,9 @@ def main():
         train(args, model, device, train_loader, optimizer, epoch) # None placeholder for triplet loss argument
         trloss = test(model, device, train_loader, "train data") # training loss
         vloss = test(model, device, val_loader, "val data") # validation loss
-        trainLoss.append(trloss)
-        valLoss.append(vloss)
+        # Move losses to cpu for plotting
+        trainLoss.append(trloss.cpu())
+        valLoss.append(vloss.cpu())
         scheduler.step()  # learning rate scheduler
 
         if args.save_model:
@@ -420,6 +422,7 @@ def main():
     plt.xlabel('epoch')
     plt.ylabel('loss')
     plt.legend()
+    f.savefig(os.path.join(args.output_data_dir, 'learning_curve.pdf'))
     plt.show()
 
 
