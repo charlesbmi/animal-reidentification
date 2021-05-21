@@ -101,7 +101,7 @@ def main():
                         help='random seed (default: 1)')
     parser.add_argument('--no-cuda', action='store_true', default=False,
                         help='disables CUDA training')
-    parser.add_argument('--load-model', type=str,
+    parser.add_argument('--load-model', type=str, default=os.environ.get('SM_CHANNEL_LOAD_MODEL'),
                         help='model file path or model name for plotting fract comparison')
     parser.add_argument('--save-model', type=bool, default=True,
                         help='For Saving the current Model')
@@ -193,9 +193,11 @@ def main():
     ])
 
     if args.evaluate:
-        print('EVALUATING MODEL')
         # generate some plots, don't actually train the model
         modelName = args.name + '_model.pt'
+        if args.load_model:
+            modelName = args.load_model
+        print('EVALUATING MODEL:', modelName)
         model = initialize_model()
         model = model.to(device)
         model.load_state_dict(torch.load(modelName))
@@ -390,6 +392,9 @@ def main():
     model = initialize_model()
     # print(model)
     model = model.to(device)
+    if args.load_model:
+        print('Loading model from:', args.load_model)
+        model.load_state_dict(torch.load(args.load_model))
     # Try different optimzers here [Adam, SGD, RMSprop]
     optimizer = optim.Adam(model.parameters(), lr=args.lr, weight_decay = args.weight_decay)
 
