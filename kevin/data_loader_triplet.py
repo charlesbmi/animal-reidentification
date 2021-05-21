@@ -76,7 +76,7 @@ class TripletZebras(torch.utils.data.Dataset):
 
             if self.mask_bbox:
                 # Top-left, bottom-right coordinates
-                bbox_tlbr = annotation['bbox_tlbr']
+                bbox_tlbr = annotation['maskrcnn_bbox']
                 # bbox_tlbr = annotation['bbox']
                 x_tl, y_tl, x_br, y_br = bbox_tlbr
                 # Round partial pixels as necessary

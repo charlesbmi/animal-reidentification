@@ -80,7 +80,7 @@ class TripletZebras(torch.utils.data.Dataset):
             
             if self.mask_bbox:
                 # Crop to bounding box
-                image = self.crop_to_bbox(image, annotation['bbox_tlbr'])
+                image = self.crop_to_bbox(image, annotation['maskrcnn_bbox'])
 
             # Transform to tensor
             if self.transform:
