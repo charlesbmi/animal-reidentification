@@ -43,7 +43,7 @@ def main():
 
         cols = ['avg_loss', 'error_rate']
         # Corresponding ylims
-        ylims = [(9e-3, 3e0), (1.3e-1, 4.5e-1)]
+        ylims = [(2e-3, 3e0), (3e-2, 4.5e-1)]
 
 
         for col_idx, col in enumerate(cols):
