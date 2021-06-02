@@ -14,7 +14,7 @@ import matplotlib.pyplot as plt
 def parse_args():
     parser = argparse.ArgumentParser(description='Find geographic diversity of images')
     parser.add_argument('-j', '--json', type=pathlib.Path,
-            default='/media/data/ComputerVisionCourse/zebragiraffe/annotations/customSplit_train.json',
+            default='/media/data/ComputerVisionCourse/zebragiraffe/annotations/customSplit_test.json',
             help='Annotations JSON file in COCO-format')
     parser.add_argument('-c', '--category-id-list', type=int,
             nargs='+',
@@ -24,8 +24,10 @@ def parse_args():
             default=111320,
             help='Rough conversion of latitude/longitu degrees to meters')
     parser.add_argument('-t', '--threshold-degrees', type=float,
-            default=1e-3,
+            default=3e-3,
             help='Threshold (in lat/lon degrees) of distance to consider "different place"')
+    parser.add_argument('-o', '--output-folder', type=pathlib.Path,
+            default='.', help='Output folder for plots and csv')
 
     return parser.parse_args()
 
@@ -77,8 +79,7 @@ def main():
 
     # Make a violin plot of these standard-deviations...
 
-    args.threshold_degrees = 1e-3  # 111 meters
-    threshold_same_location_m = args.threshold_degrees * args.meters_per_degree,
+    threshold_same_location_m = args.threshold_degrees * args.meters_per_degree
 
     geo_spread = df.groupby('zebra_name')[['latitude', 'longitude']].std()
     geo_spread = geo_spread.dropna('index')
@@ -86,7 +87,7 @@ def main():
     # Plot some figures
     fig, ax = plt.subplots(figsize=(9, 9))
     sns.boxplot(data=geo_spread, ax=ax)
-    ax.set_title(f'How geographically diverse is each zebra\'s sightings?\nSpread of sigma for n={len(geo_spread)} individuals (that had >=2 sightings with lat/lon data).')
+    ax.set_title(f'How geographically diverse is each zebra\'s sightings?\nSpread of sigma for n={len(geo_spread)} individuals (that had >=2 sightings with lat/lon data)\n{args.json.name}')
     ax.set_ylabel('std (meters)')
     ax.axhline(
         threshold_same_location_m,
@@ -96,16 +97,30 @@ def main():
     )
     ax.set_yscale('log')
     ax.legend()
+    fig.savefig(args.output_folder.joinpath('geodiversity.png'))
 
     print('Number of zebras with at least threshold lat/lon standard deviation:')
-    print((geo_spread > 111).sum())
+    print((geo_spread > threshold_same_location_m).sum())
     print('Number of zebras with that surpass the threshold for either lat OR lon:',
-          (geo_spread > 111).any('columns').sum())
+          (geo_spread > threshold_same_location_m).any('columns').sum())
 
 
     plt.ion()
     plt.pause(0.001)
-    import pdb; pdb.set_trace()
+
+    geodiverse_zebras = geo_spread.loc[(geo_spread > threshold_same_location_m).any('columns')]
+    num_zebras = len(geodiverse_zebras)
+
+    # Get the same number of zebras individuals for the other dataset
+    geosimilar_zebras = geo_spread.mean(axis='columns').sort_values().iloc[:num_zebras]
+
+    # Save these out, index only
+    geodiverse_zebras.to_csv(args.output_folder.joinpath('geodiverse_zebras.csv'),
+                             columns=[])
+    geosimilar_zebras.to_csv(args.output_folder.joinpath('geosimilar_zebras.csv'),
+                             columns=[])
+
+    print('Saved out files to:', args.output_folder)
 
 
 if __name__ == '__main__':
