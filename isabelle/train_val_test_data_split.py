@@ -3,6 +3,7 @@ import numpy as np
 import os
 
 np.random.seed(21)
+trainFract = 0.5 #0.125
 
 # load the annotations
 BOX_ANNOTATION_FILE = '../../Data/gzgc.coco/annotations/instances_train2020.json'
@@ -58,7 +59,12 @@ zebra_over_two_val = [zebra_names_over_two[a] for a in rand_split_inds[trainValD
 zebra_over_two_test = [zebra_names_over_two[a] for a in rand_split_inds[valTestDivide:]]
 
 # concatenate ids over groups
-zebra_train = zebra_one_train + zebra_two_train + zebra_over_two_train
+if trainFract == 1.0:
+    zebra_train = zebra_one_train + zebra_two_train + zebra_over_two_train
+else:
+    zebra_train = zebra_one_train[:int(np.floor(len(zebra_one_train)*trainFract))]\
+                  + zebra_two_train[:int(np.floor(len(zebra_two_train)*trainFract))]\
+                  + zebra_over_two_train[:int(np.floor(len(zebra_over_two_train)*trainFract))]
 zebra_val = zebra_one_val + zebra_two_val + zebra_over_two_val
 zebra_test = zebra_one_test + zebra_two_test + zebra_over_two_test
 
@@ -104,14 +110,17 @@ print(totalAnns)
 new_data_path = '../../Data/gzgc.coco/annotations/'
 os.makedirs(new_data_path, exist_ok=True) # create directory if needed
 
-with open(new_data_path + 'customSplit_seg_train.json', 'w') as outfile:
-    json.dump(data_train, outfile, indent = 4, ensure_ascii = False)
+if trainFract == 1.0:
+    with open(new_data_path + 'customSplit_seg_train.json', 'w') as outfile:
+        json.dump(data_train, outfile, indent = 4, ensure_ascii = False)
+    with open(new_data_path + 'customSplit_seg_val.json', 'w') as outfile:
+        json.dump(data_val, outfile, indent=4, ensure_ascii=False)
+    with open(new_data_path + 'customSplit_seg_test.json', 'w') as outfile:
+        json.dump(data_test, outfile, indent=4, ensure_ascii=False)
+else:
+    with open(new_data_path + 'customSplit_seg_train_' + str(trainFract) + '.json', 'w') as outfile:
+        json.dump(data_train, outfile, indent = 4, ensure_ascii = False)
 
-with open(new_data_path + 'customSplit_seg_val.json', 'w') as outfile:
-    json.dump(data_val, outfile, indent = 4, ensure_ascii = False)
-
-with open(new_data_path + 'customSplit_seg_test.json', 'w') as outfile:
-    json.dump(data_test, outfile, indent = 4, ensure_ascii = False)
 
 #6286
 # targ train = 4400

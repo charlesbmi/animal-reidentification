@@ -149,11 +149,13 @@ def main():
     use_seg = args.use_seg
     use_bbox = args.use_bbox
     use_aug = args.apply_augmentation
+    trainFract = args.train_fract
     margin = args.margin
     print('use seg?', use_seg)
     print('use bbox?', use_bbox)
     print('use aug?', use_aug)
     print('using margin: ' + str(margin))
+    print('using training fraction: ' + str(trainFract))
     np.random.seed(2021)  # to ensure you always get the same train/test split
     torch.manual_seed(args.seed)
     device = torch.device("cuda" if use_cuda else "cpu")
@@ -206,13 +208,6 @@ def main():
         model = model.to(device)
         model.load_state_dict(torch.load(modelName))
         model.eval()
-
-        # load the underlying annotations file for the
-        BOX_ANNOTATION_FILE = '../../Data/gzgc.coco/masks/instances_train2020_maskrcnn.json'
-        with open(BOX_ANNOTATION_FILE) as f:
-            annData = json.load(f)
-        f.close()
-        annData = annData['annotations'] #just the annotations
 
         val_loader = data_loader.get_loader(
             args.data_folder,
